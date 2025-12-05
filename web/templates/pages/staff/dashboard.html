@@ -1,0 +1,172 @@
+{{ define "content" }}
+<div class="max-w-[480px] mx-auto min-h-screen bg-f8fafc border-x border-slate-200 relative pb-24">
+
+    <!-- Header IT Staff -->
+    <header class="bg-blue-600 text-white p-6 pb-12 rounded-b-[2rem] shadow-lg relative overflow-hidden z-10">
+        <div class="flex justify-between items-center relative z-10">
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <img src="{{ if .user.AvatarURL }}{{ .user.AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .user.FullName }}&background=random{{ end }}"
+                        class="w-10 h-10 rounded-full border-2 border-white object-cover">
+                    <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-blue-600 rounded-full">
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">{{ .user.FullName }}</h1>
+                    <span class="text-xs text-blue-200">{{ .user.Role }}</span>
+                </div>
+            </div>
+            <button onclick="document.getElementById('bigbook-modal').classList.remove('hidden')"
+                class="bg-white/20 hover:bg-white/30 p-2.5 rounded-xl transition backdrop-blur-sm">
+                <i class="fas fa-search text-white"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- DYNAMIC CONTENT AREA -->
+    <main class="px-5 -mt-8 relative z-20 space-y-5 pb-24">
+
+        <!-- Quick Stats Cards -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                <span class="block text-xl font-bold text-blue-600">{{ .ticketCount }}</span>
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tickets</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                <span class="block text-xl font-bold text-red-500">{{ .urgentCount }}</span>
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Urgent</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                <span class="block text-xl font-bold text-green-500">98%</span>
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SLA</span>
+            </div>
+        </div>
+
+        <!-- Routine Tasks Section -->
+        <div>
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fas fa-clipboard-list text-blue-500"></i> Checklist Shift Ini
+                </h3>
+            </div>
+
+            {{ range .routines }}
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+                <div class="p-3 border-b border-slate-100 bg-red-50 flex justify-between items-center">
+                    <span class="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ {{ .Title }}</span>
+                    <span class="text-xs text-red-600 font-mono font-bold">Due: {{ .DueTime }}</span>
+                </div>
+                {{ $routineID := .ID }}
+                <div class="divide-y divide-slate-100">
+                    {{ range $item, $done := .Items }}
+                    <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition">
+                        <input type="checkbox"
+                            class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" {{
+                            if $done }}checked{{ end }}
+                            hx-post="/staff/routine/{{ $routineID }}/toggle?item={{ $item }}" hx-swap="none">
+                        <span
+                            class="text-sm text-slate-700 font-medium {{ if $done }}line-through text-slate-400{{ end }}">{{
+                            $item }}</span>
+                    </label>
+                    {{ end }}
+                </div>
+            </div>
+            {{ else }}
+            <div
+                class="text-center p-4 text-slate-400 text-sm bg-white rounded-xl border border-slate-200 border-dashed">
+                Tidak ada tugas rutin saat ini.
+            </div>
+            {{ end }}
+        </div>
+
+        <!-- Active Tickets -->
+        <div>
+            <h3 class="font-bold text-slate-700 mb-2 mt-2 flex items-center gap-2">
+                <i class="fas fa-ticket-alt text-purple-500"></i> Tiket Aktif
+            </h3>
+            <div class="space-y-3">
+                {{ range .tickets }}
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 {{ if eq .Priority " URGENT_ON_AIR"
+                    }}border-red-500{{ else }}border-purple-500{{ end }} active:scale-[0.98] transition transform
+                    cursor-pointer border-t border-r border-b border-slate-100"
+                    onclick="window.location.href='/staff/tickets/{{ .ID }}'">
+                    <div class="flex justify-between items-start">
+                        <h4 class="font-bold text-sm text-slate-800">{{ .Subject }}</h4>
+                        <span class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold">{{
+                            .CreatedAt.Format "15:04" }}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">{{ .Location }} &bull; {{ .Requester.FullName }}</p>
+                    <p class="text-xs text-slate-400 italic mt-1">{{ .Description }}</p>
+                </div>
+                {{ else }}
+                <div class="text-center text-slate-400 py-4 text-sm">Tidak ada tiket aktif.</div>
+                {{ end }}
+            </div>
+        </div>
+    </main>
+
+    <!-- BOTTOM NAV (IT STAFF) -->
+    <nav
+        class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-slate-200 flex justify-around py-3 px-2 text-[10px] font-bold text-slate-400 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
+        <a href="/staff" class="flex flex-col items-center gap-1.5 text-blue-600 w-16 transition">
+            <i class="fas fa-home text-lg"></i> Home
+        </a>
+        <a href="/staff/alerts" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition relative">
+            <i class="fas fa-bell text-lg"></i> Alert
+            {{ if gt .urgentCount 0 }}
+            <span
+                class="absolute top-0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+            {{ end }}
+        </a>
+        <a href="/staff/profile" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
+            <i class="fas fa-user text-lg"></i> Profile
+        </a>
+    </nav>
+</div>
+
+<!-- BIG BOOK SEARCH MODAL (Shared with Consumer style) -->
+<div id="bigbook-modal"
+    class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
+    x-data="{ query: '', articles: [] }">
+    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10">
+            <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> Big Book Search</h2>
+            <button onclick="document.getElementById('bigbook-modal').classList.add('hidden')"
+                class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition"><i
+                    class="fas fa-times text-lg"></i></button>
+        </div>
+
+        <div class="p-4 border-b border-slate-200 bg-slate-50">
+            <div class="relative">
+                <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                <input type="text" x-model="query"
+                    @input.debounce.500ms="fetch('/staff/bigbook/search?q='+query).then(r=>r.json()).then(data=>articles=data)"
+                    placeholder="Search knowledge base..."
+                    class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+            <template x-for="article in articles" :key="article.ID || article.Title">
+                <div
+                    class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-blue-700 text-lg group-hover:underline" x-text="article.Title"></h3>
+                        <span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase"
+                            x-text="article.Category || 'General'"></span>
+                    </div>
+                    <!-- Handle both standard Articles and Ticket Candidates -->
+                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed"
+                        x-text="(article.Content || article.Solution || '').substring(0, 100) + '...'"></p>
+                </div>
+            </template>
+            <div x-show="articles.length === 0 && query !== ''" class="text-center text-slate-400 mt-10">
+                <p>No results found.</p>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 bg-slate-50 text-center">
+            <a href="/staff/bigbook" class="text-blue-600 font-bold text-sm hover:underline">View Full Big Book Page</a>
+        </div>
+    </div>
+    {{ end }}

@@ -1,0 +1,32 @@
+# Binary
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+app.exe
+it-broadcast-ops.exe
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+vendor/
+go.work
+
+# Web
+web/uploads/*
+!web/uploads/.keep
+node_modules/
+.DS_Store
+
+# Logs
+*.log

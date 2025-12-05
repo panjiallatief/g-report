@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Broadcast Ops - Final Blueprint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* --- UTILITIES --- */
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Mobile Frame for Consumer & IT Views */
+        .mobile-frame {
+            max-width: 480px;
+            margin: 0 auto;
+            border-left: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            min-height: 100vh;
+            background-color: #f8fafc;
+            padding-bottom: 90px; /* Space for bottom nav */
+            position: relative;
+        }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100 text-slate-800">
+
+    <!-- ROLE SWITCHER (Untuk Demo Saja) -->
+    <div class="fixed top-4 right-4 z-50 bg-slate-900 text-white p-2 rounded-xl shadow-2xl flex flex-col gap-2 border border-slate-700">
+        <span class="text-[10px] font-bold uppercase text-slate-400 text-center tracking-wider">Switch Persona</span>
+        <button onclick="switchRole('consumer')" id="btn-consumer" class="text-xs px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2"><i class="fas fa-user w-4"></i> Consumer</button>
+        <button onclick="switchRole('staff')" id="btn-staff" class="text-xs px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 transition border border-blue-400 flex items-center gap-2"><i class="fas fa-tools w-4"></i> IT Staff</button>
+        <button onclick="switchRole('manager')" id="btn-manager" class="text-xs px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2"><i class="fas fa-chart-line w-4"></i> Manager</button>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 1: CONSUMER (User Biasa / Presenter) -->
+    <!-- ================================================================== -->
+    <div id="view-consumer" class="mobile-frame bg-white hidden fade-in">
+        <!-- Header Consumer -->
+        <header class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-8 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
+            <div class="relative z-10">
+                <div class="flex items-center gap-4 mb-4">
+                    <img src="https://ui-avatars.com/api/?name=Tiara+Putri&background=random&color=fff&background=6366f1" class="w-12 h-12 rounded-full border-2 border-white/50">
+                    <div>
+                        <h1 class="text-xl font-bold">Halo, Tiara</h1>
+                        <p class="text-indigo-200 text-sm">Presenter Studio 2</p>
+                    </div>
+                </div>
+                
+                <!-- Search Bar (Fokus Utama: Deflection) -->
+                <div class="relative group">
+                    <input type="text" placeholder="Cari solusi (mis: Mic mati?)" class="w-full pl-11 pr-4 py-3.5 rounded-xl text-slate-800 text-sm shadow-lg focus:outline-none focus:ring-4 focus:ring-indigo-300 transition placeholder:text-slate-400">
+                    <i class="fas fa-search absolute left-4 top-4 text-slate-400 group-focus-within:text-indigo-500 transition"></i>
+                </div>
+            </div>
+            <!-- Decoration -->
+            <i class="fas fa-question absolute -right-6 -bottom-8 text-[8rem] text-white opacity-10 rotate-12"></i>
+        </header>
+
+        <!-- Main Action Buttons -->
+        <div class="p-6 grid grid-cols-2 gap-4 -mt-2">
+            <!-- Tombol Lapor (Updated: Buka Modal) -->
+            <button onclick="openModal('create-ticket-modal')" class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover:bg-red-50 hover:border-red-200 transition group active:scale-95 transform">
+                <div class="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition shadow-sm"><i class="fas fa-exclamation-triangle"></i></div>
+                <span class="text-sm font-bold text-slate-700">Lapor Masalah</span>
+            </button>
+            <button onclick="openModal('bigbook-modal')" class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover:bg-indigo-50 hover:border-indigo-200 transition group active:scale-95 transform">
+                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition shadow-sm"><i class="fas fa-book-reader"></i></div>
+                <span class="text-sm font-bold text-slate-700">Buka Big Book</span>
+            </button>
+        </div>
+
+        <!-- Ticket History -->
+        <div class="px-6 pb-6">
+            <div class="flex justify-between items-end mb-4">
+                <h3 class="font-bold text-slate-800 text-lg">Tiket Terakhir</h3>
+                <a href="#" class="text-xs text-indigo-600 font-bold hover:underline">Lihat Semua</a>
+            </div>
+            
+            <div class="space-y-3">
+                <!-- Active Ticket -->
+                <div class="bg-white border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm flex justify-between items-center hover:shadow-md transition cursor-pointer">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Sedang Dicek</span>
+                            <span class="text-xs text-slate-400">#T-2099</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-slate-800">PC Editing Restart Sendiri</h4>
+                        <p class="text-xs text-slate-500 mt-1">Ditangani oleh: <span class="font-bold">Budi (IT)</span></p>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300"></i>
+                </div>
+
+                <!-- Solved Ticket -->
+                <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl flex justify-between items-center opacity-70">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Selesai</span>
+                            <span class="text-xs text-slate-400">#T-2088</span>
+                        </div>
+                        <h4 class="font-bold text-sm text-slate-600">Install Adobe Premiere</h4>
+                    </div>
+                    <i class="fas fa-check-circle text-green-500"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================================================== -->
+    <!-- VIEW 2: IT STAFF (Teknisi Lapangan - PWA) -->
+    <!-- ================================================================== -->
+    <div id="view-staff" class="mobile-frame relative fade-in">
+        
+        <!-- Header IT Staff -->
+        <header class="bg-blue-600 text-white p-6 pb-12 rounded-b-[2rem] shadow-lg relative overflow-hidden z-10">
+            <div class="flex justify-between items-center relative z-10">
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <img src="https://ui-avatars.com/api/?name=Budi+Santoso&background=random" class="w-10 h-10 rounded-full border-2 border-white">
+                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-blue-600 rounded-full"></div>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">Budi Santoso</h1>
+                        <span class="text-xs text-blue-200">Shift Pagi (07:00 - 15:00)</span>
+                    </div>
+                </div>
+                <button onclick="openModal('bigbook-modal')" class="bg-white/20 hover:bg-white/30 p-2.5 rounded-xl transition backdrop-blur-sm">
+                    <i class="fas fa-search text-white"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- DYNAMIC CONTENT AREA (Switched by Bottom Nav) -->
+        <main id="staff-content-home" class="px-5 -mt-8 relative z-20 space-y-5 pb-24">
+            
+            <!-- Quick Stats Cards -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                    <span class="block text-xl font-bold text-blue-600">5</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tickets</span>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                    <span class="block text-xl font-bold text-red-500">2</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Urgent</span>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow-md text-center border border-slate-100">
+                    <span class="block text-xl font-bold text-green-500">98%</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SLA</span>
+                </div>
+            </div>
+
+            <!-- Routine Tasks Section -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                        <i class="fas fa-clipboard-list text-blue-500"></i> Checklist Shift Ini
+                    </h3>
+                    <span class="text-xs font-bold text-red-500 animate-pulse">Expires in 10m</span>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-3 border-b border-slate-100 bg-red-50 flex justify-between items-center">
+                        <span class="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Pra-Siaran Studio 1</span>
+                        <span class="text-xs text-red-600 font-mono font-bold">09:50 WIB</span>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition">
+                            <input type="checkbox" class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                            <span class="text-sm text-slate-700 font-medium">Cek Audio Mic 1-4</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition">
+                            <input type="checkbox" class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                            <span class="text-sm text-slate-700 font-medium">Test Koneksi Internet (Speedtest)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Tickets -->
+            <div>
+                <h3 class="font-bold text-slate-700 mb-2 mt-2 flex items-center gap-2">
+                    <i class="fas fa-ticket-alt text-purple-500"></i> Tiket Aktif
+                </h3>
+                <div class="space-y-3">
+                    <!-- Ticket Item -->
+                    <div onclick="openModal('ticket-detail-modal')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500 active:scale-[0.98] transition transform cursor-pointer border-t border-r border-b border-slate-100">
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-sm text-slate-800">Printer Kantor Macet</h4>
+                            <span class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold">10m ago</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Lantai 2, Divisi Keuangan. Kertas nyangkut.</p>
+                        
+                        <!-- Smart Suggestion Badge -->
+                        <div class="mt-3 flex gap-2">
+                             <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold flex items-center gap-1">
+                                <i class="fas fa-lightbulb"></i> Big Book Suggestion
+                             </span>
+                        </div>
+                    </div>
+
+                     <!-- Handover Ticket Item -->
+                     <div onclick="openModal('ticket-detail-modal')" class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500 active:scale-[0.98] transition transform cursor-pointer border-t border-r border-b border-slate-100 opacity-90">
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold text-sm text-slate-800">Install OBS Studio</h4>
+                            <span class="text-[10px] bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">Handover</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Dari shift malam: "Download gagal terus, tolong dilanjut."</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Alerts Content -->
+        <main id="staff-content-alerts" class="hidden px-5 py-6 pb-24 fade-in">
+            <h2 class="text-xl font-bold mb-4">Notifikasi</h2>
+            <div class="space-y-4">
+                <div class="flex gap-4 bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
+                    <div class="mt-1"><i class="fas fa-exclamation-circle text-red-500 text-lg"></i></div>
+                    <div>
+                        <h4 class="font-bold text-sm">Tiket Urgent Masuk!</h4>
+                        <p class="text-xs text-slate-500 mt-1">AC Server Room bocor. Segera cek lokasi.</p>
+                        <span class="text-[10px] text-slate-400 mt-2 block font-medium">2 menit yang lalu</span>
+                    </div>
+                </div>
+                <div class="flex gap-4 bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                    <div class="mt-1"><i class="fas fa-clock text-blue-500 text-lg"></i></div>
+                    <div>
+                        <h4 class="font-bold text-sm">Routine Task: Pra-Siaran</h4>
+                        <p class="text-xs text-slate-500 mt-1">Checklist siaran Studio 1 telah dibuat.</p>
+                        <span class="text-[10px] text-slate-400 mt-2 block font-medium">15 menit yang lalu</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Profile Content -->
+        <main id="staff-content-profile" class="hidden px-5 py-6 pb-24 fade-in">
+            <div class="text-center mb-8">
+                <div class="w-24 h-24 bg-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl text-white font-bold border-4 border-blue-100 shadow-lg">B</div>
+                <h2 class="font-bold text-xl text-slate-800">Budi Santoso</h2>
+                <p class="text-sm text-slate-500 font-medium">Senior IT Support</p>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100">
+                <div class="p-5 flex justify-between items-center">
+                    <span class="text-sm font-medium text-slate-600">Total Shift Bulan Ini</span>
+                    <span class="font-bold text-slate-800">22</span>
+                </div>
+                <div class="p-5 flex justify-between items-center">
+                    <span class="text-sm font-medium text-slate-600">Avg Response Time (MTTA)</span>
+                    <span class="font-bold text-green-600">8 Menit</span>
+                </div>
+                <div class="p-5 flex justify-between items-center">
+                    <span class="text-sm font-medium text-slate-600">Solusi di Big Book</span>
+                    <span class="font-bold text-blue-600">14 Artikel</span>
+                </div>
+            </div>
+            
+            <button class="w-full mt-6 bg-red-50 text-red-600 py-4 rounded-xl font-bold hover:bg-red-100 transition border border-red-100">Logout</button>
+        </main>
+
+        <!-- BOTTOM NAV (IT STAFF) -->
+        <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-slate-200 flex justify-around py-3 px-2 text-[10px] font-bold text-slate-400 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
+            <button onclick="switchStaffTab('home')" id="nav-home" class="flex flex-col items-center gap-1.5 text-blue-600 w-16 transition">
+                <i class="fas fa-home text-lg"></i> Home
+            </button>
+            <button onclick="switchStaffTab('alerts')" id="nav-alerts" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition relative">
+                <i class="fas fa-bell text-lg"></i> Alert
+                <span class="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
+            <button onclick="switchStaffTab('profile')" id="nav-profile" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
+                <i class="fas fa-user text-lg"></i> Profile
+            </button>
+        </nav>
+    </div>
+
+
+    <!-- ================================================================== -->
+    <!-- VIEW 3: MANAGER (Admin Dashboard - Desktop) -->
+    <!-- ================================================================== -->
+    <div id="view-manager" class="hidden min-h-screen bg-slate-100 pl-0 md:pl-64 fade-in font-sans">
+        
+        <!-- Sidebar -->
+        <aside class="hidden md:block fixed left-0 top-0 h-full w-64 bg-slate-900 text-white z-10 shadow-xl">
+            <div class="p-6 text-2xl font-bold tracking-tight text-white flex items-center gap-2 border-b border-slate-800">
+                <i class="fas fa-network-wired text-blue-500"></i> IT<span class="text-blue-500">OPS</span>
+            </div>
+            <nav class="p-4 space-y-2 mt-4">
+                <a onclick="switchManagerTab('dashboard')" id="mgr-nav-dashboard" class="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded-lg text-white font-medium shadow-lg shadow-blue-900/50 cursor-pointer transition">
+                    <i class="fas fa-chart-pie w-5 text-center"></i> Dashboard
+                </a>
+                <a onclick="switchManagerTab('shifts')" id="mgr-nav-shifts" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer">
+                    <i class="fas fa-calendar-alt w-5 text-center"></i> Shift Management
+                </a>
+                <a onclick="switchManagerTab('bigbook')" id="mgr-nav-bigbook" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer">
+                    <i class="fas fa-book w-5 text-center"></i> Big Book Wiki
+                </a>
+                <a onclick="switchManagerTab('performance')" id="mgr-nav-performance" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer">
+                    <i class="fas fa-users-cog w-5 text-center"></i> Staff Performance
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="p-8 max-w-7xl mx-auto">
+            
+            <!-- 3.1 DASHBOARD HOME -->
+            <div id="manager-content-dashboard" class="fade-in">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Operational Dashboard</h2>
+                        <p class="text-slate-500 text-sm">Pantauan real-time KPI & Shift</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button class="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 shadow-sm">
+                            <i class="fas fa-download mr-2"></i> Report
+                        </button>
+                        <button onclick="openModal('new-shift-modal')" class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
+                            <i class="fas fa-plus mr-2"></i> New Shift
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Response (MTTA)</p>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span class="text-3xl font-bold text-slate-800">12m</span>
+                            <span class="text-xs text-green-500 font-bold bg-green-50 px-1.5 py-0.5 rounded"><i class="fas fa-arrow-down"></i> 2m</span>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Resolution (MTTR)</p>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span class="text-3xl font-bold text-slate-800">45m</span>
+                            <span class="text-xs text-red-500 font-bold bg-red-50 px-1.5 py-0.5 rounded"><i class="fas fa-arrow-up"></i> 5m</span>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-green-500">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">First Contact Res.</p>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span class="text-3xl font-bold text-slate-800">78%</span>
+                            <span class="text-xs text-slate-400">Target: 80%</span>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-orange-500">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Big Book Articles</p>
+                        <div class="mt-2 flex items-baseline gap-2">
+                            <span class="text-3xl font-bold text-slate-800">142</span>
+                            <span class="text-xs text-blue-500 font-bold bg-blue-50 px-1.5 py-0.5 rounded">+5 New</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Overview Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">Active Shift</h3>
+                            <span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">Pagi (07:00 - 15:00)</span>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="relative">
+                                        <img src="https://ui-avatars.com/api/?name=Budi+Santoso&background=random" class="w-10 h-10 rounded-full">
+                                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-800">Budi Santoso</p>
+                                        <p class="text-xs text-slate-500">Studio 1 &bull; 1 Ticket Active</p>
+                                    </div>
+                                </div>
+                                <button class="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50">Detail</button>
+                            </div>
+                            <button onclick="switchManagerTab('shifts')" class="w-full text-center text-sm text-blue-600 font-bold py-2 hover:bg-blue-50 rounded-lg transition">Lihat Jadwal Lengkap</button>
+                        </div>
+                    </div>
+
+                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">Pending Approval</h3>
+                            <span class="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded">2 Articles</span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            <div class="p-4 hover:bg-slate-50 cursor-pointer" onclick="switchManagerTab('bigbook')">
+                                <h4 class="font-bold text-sm text-slate-700">Cara Reset Audio Interface</h4>
+                                <p class="text-xs text-slate-500">Author: Budi &bull; Waiting since 2h ago</p>
+                            </div>
+                            <div class="p-4 hover:bg-slate-50 cursor-pointer" onclick="switchManagerTab('bigbook')">
+                                <h4 class="font-bold text-sm text-slate-700">Panduan Router Lt.2</h4>
+                                <p class="text-xs text-slate-500">Author: Andi &bull; Waiting since 5h ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3.2 SHIFT MANAGEMENT VIEW -->
+            <div id="manager-content-shifts" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Shift Management</h2>
+                        <p class="text-slate-500 text-sm">Atur jadwal teknisi mingguan</p>
+                    </div>
+                    <button onclick="openModal('new-shift-modal')" class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
+                        <i class="fas fa-plus mr-2"></i> Add Shift
+                    </button>
+                </div>
+
+                <!-- CSV Import -->
+                <div class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 mb-8 hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer group">
+                    <i class="fas fa-file-csv text-4xl text-slate-300 mb-3 group-hover:text-blue-500 transition"></i>
+                    <p class="text-sm font-bold text-slate-600">Drag & Drop CSV Schedule Here</p>
+                    <p class="text-xs text-slate-400 mt-1">Format: email, shift_name, start_time, end_time</p>
+                </div>
+
+                <!-- Schedule Table -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4">Day / Date</th>
+                                <th class="px-6 py-4">Shift Name</th>
+                                <th class="px-6 py-4">Staff</th>
+                                <th class="px-6 py-4">Time</th>
+                                <th class="px-6 py-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="bg-blue-50/50">
+                                <td class="px-6 py-4 font-bold text-blue-700">Today</td>
+                                <td class="px-6 py-4"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">Pagi</span></td>
+                                <td class="px-6 py-4 font-medium flex items-center gap-2">
+                                    <img src="https://ui-avatars.com/api/?name=Budi+Santoso&background=random" class="w-6 h-6 rounded-full"> Budi Santoso
+                                </td>
+                                <td class="px-6 py-4 text-slate-600">07:00 - 15:00</td>
+                                <td class="px-6 py-4"><button class="text-slate-400 hover:text-red-500"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-medium">Tomorrow</td>
+                                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">Siang</span></td>
+                                <td class="px-6 py-4 font-medium flex items-center gap-2">
+                                    <img src="https://ui-avatars.com/api/?name=Andi+Wibowo&background=random" class="w-6 h-6 rounded-full"> Andi Wibowo
+                                </td>
+                                <td class="px-6 py-4 text-slate-600">14:00 - 22:00</td>
+                                <td class="px-6 py-4"><button class="text-slate-400 hover:text-red-500"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                             <tr>
+                                <td class="px-6 py-4 font-medium">Sat, 28 Oct</td>
+                                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">Malam</span></td>
+                                <td class="px-6 py-4 font-medium flex items-center gap-2">
+                                    <img src="https://ui-avatars.com/api/?name=Siti+Aminah&background=random" class="w-6 h-6 rounded-full"> Siti Aminah
+                                </td>
+                                <td class="px-6 py-4 text-slate-600">22:00 - 06:00</td>
+                                <td class="px-6 py-4"><button class="text-slate-400 hover:text-red-500"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3.3 BIG BOOK WIKI VIEW -->
+            <div id="manager-content-bigbook" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Big Book Wiki</h2>
+                        <p class="text-slate-500 text-sm">Knowledge Base & Approval System</p>
+                    </div>
+                </div>
+
+                <!-- Approval Queue -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                    <div class="p-4 border-b border-slate-100 bg-orange-50 flex items-center gap-2">
+                        <i class="fas fa-clock text-orange-500"></i>
+                        <h3 class="font-bold text-orange-800 text-sm">Pending Verification (2)</h3>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        <!-- Item 1 -->
+                        <div class="p-5 flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-lg text-slate-800">Cara Mengatasi Mic Wireless 'Interference'</h4>
+                                <p class="text-sm text-slate-500 mt-1">Author: <span class="font-bold text-slate-700">Budi Santoso</span> &bull; Submitted today</p>
+                                <p class="text-sm text-slate-600 mt-2 bg-slate-50 p-2 rounded border border-slate-100 italic">"Langkah pertama adalah mengubah channel frekuensi pada receiver..."</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-700">Approve</button>
+                                <button class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50">Edit</button>
+                            </div>
+                        </div>
+                        <!-- Item 2 -->
+                        <div class="p-5 flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-lg text-slate-800">Panduan Reset Router Lantai 2</h4>
+                                <p class="text-sm text-slate-500 mt-1">Author: <span class="font-bold text-slate-700">Andi Wibowo</span> &bull; Submitted yesterday</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-700">Approve</button>
+                                <button class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Published List -->
+                <h3 class="font-bold text-slate-700 mb-4">Published Articles</h3>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-3">Title</th>
+                                <th class="px-6 py-3">Category</th>
+                                <th class="px-6 py-3">Views</th>
+                                <th class="px-6 py-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr>
+                                <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer">Printer Error 505 Fix</td>
+                                <td class="px-6 py-3"><span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">Hardware</span></td>
+                                <td class="px-6 py-3">1,204</td>
+                                <td class="px-6 py-3"><button class="text-slate-400 hover:text-blue-500"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer">OBS Streaming Setup</td>
+                                <td class="px-6 py-3"><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">Software</span></td>
+                                <td class="px-6 py-3">892</td>
+                                <td class="px-6 py-3"><button class="text-slate-400 hover:text-blue-500"><i class="fas fa-edit"></i></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3.4 STAFF PERFORMANCE VIEW -->
+            <div id="manager-content-performance" class="hidden fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Staff Performance</h2>
+                        <p class="text-slate-500 text-sm">Evaluasi KPI Tim IT Support</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <select class="bg-white border border-slate-300 px-3 py-2 rounded-lg text-sm">
+                            <option>This Month</option>
+                            <option>Last Month</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4">Staff Name</th>
+                                <th class="px-6 py-4 text-center">Tickets Solved</th>
+                                <th class="px-6 py-4 text-center">Avg Response (MTTA)</th>
+                                <th class="px-6 py-4 text-center">Avg Resolution (MTTR)</th>
+                                <th class="px-6 py-4 text-center">Big Book Contrib.</th>
+                                <th class="px-6 py-4 text-center">Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <!-- Staff 1 -->
+                            <tr>
+                                <td class="px-6 py-4 flex items-center gap-3">
+                                    <img src="https://ui-avatars.com/api/?name=Budi+Santoso&background=random" class="w-8 h-8 rounded-full">
+                                    <div>
+                                        <p class="font-bold text-slate-800">Budi Santoso</p>
+                                        <p class="text-xs text-slate-500">Senior Staff</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-center font-bold text-lg">42</td>
+                                <td class="px-6 py-4 text-center text-green-600 font-bold">8 mins</td>
+                                <td class="px-6 py-4 text-center">45 mins</td>
+                                <td class="px-6 py-4 text-center"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">14</span></td>
+                                <td class="px-6 py-4 text-center text-yellow-500"><i class="fas fa-star"></i> 4.9</td>
+                            </tr>
+                            <!-- Staff 2 -->
+                            <tr>
+                                <td class="px-6 py-4 flex items-center gap-3">
+                                    <img src="https://ui-avatars.com/api/?name=Andi+Wibowo&background=random" class="w-8 h-8 rounded-full">
+                                    <div>
+                                        <p class="font-bold text-slate-800">Andi Wibowo</p>
+                                        <p class="text-xs text-slate-500">Junior Staff</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-center font-bold text-lg">28</td>
+                                <td class="px-6 py-4 text-center text-yellow-600 font-bold">15 mins</td>
+                                <td class="px-6 py-4 text-center">60 mins</td>
+                                <td class="px-6 py-4 text-center"><span class="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-bold">3</span></td>
+                                <td class="px-6 py-4 text-center text-yellow-500"><i class="fas fa-star"></i> 4.5</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+
+    <!-- ================================================================== -->
+    <!-- MODALS (Global) -->
+    <!-- ================================================================== -->
+
+    <!-- NEW SHIFT MODAL (Manager Only) -->
+    <div id="new-shift-modal" class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800">Add New Shift</h3>
+                <button onclick="closeModal('new-shift-modal')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Staff Name</label>
+                    <select class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option>Budi Santoso</option>
+                        <option>Andi Wibowo</option>
+                        <option>Siti Aminah</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Shift Label</label>
+                    <input type="text" placeholder="e.g. Shift Pagi Special" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Start Time</label>
+                        <input type="datetime-local" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">End Time</label>
+                        <input type="datetime-local" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <button onclick="closeModal('new-shift-modal'); alert('Jadwal baru ditambahkan!')" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4">
+                    Save Schedule
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ... Other Modals (Big Book, Ticket) from previous code remain ... -->
+    <!-- 1. BIG BOOK SEARCH MODAL -->
+    <div id="bigbook-modal" class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 fade-in backdrop-blur-sm">
+        <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+            <!-- Modal Header -->
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10">
+                <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> The Big Book</h2>
+                <button onclick="closeModal('bigbook-modal')" class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            
+            <!-- Search -->
+            <div class="p-4 border-b border-slate-200 bg-slate-50">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                    <input type="text" placeholder="Ketik masalah (contoh: error 505, wifi lemot)..." class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+                <!-- Article Card -->
+                <div class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-blue-700 text-lg group-hover:underline">Cara Mengatasi Mic Wireless 'Interference'</h3>
+                        <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Audio</span>
+                    </div>
+                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">Langkah pertama adalah mengubah channel frekuensi pada receiver. Pastikan jarak transmitter tidak lebih dari 50 meter dari receiver untuk sinyal optimal...</p>
+                    <div class="mt-4 flex items-center gap-4 text-xs text-slate-400 font-medium">
+                        <span class="flex items-center gap-1"><i class="far fa-thumbs-up text-blue-500"></i> 15 Helpful</span>
+                        <span class="flex items-center gap-1"><i class="far fa-eye"></i> 120 Views</span>
+                    </div>
+                </div>
+
+                <!-- Article Card -->
+                <div class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold text-blue-700 text-lg group-hover:underline">Login Gagal di Aplikasi Prompter</h3>
+                        <span class="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Software</span>
+                    </div>
+                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed">Biasanya terjadi karena cache browser yang korup. Coba lakukan Hard Refresh (Ctrl+F5) atau restart service prompter di server lokal...</p>
+                </div>
+            </div>
+
+            <!-- Footer (CTA) -->
+            <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end items-center gap-3">
+                <span class="text-xs text-slate-500">Tidak menemukan solusi?</span>
+                <button onclick="closeModal('bigbook-modal'); openModal('create-ticket-modal')" class="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition">
+                    Lapor ke IT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CREATE TICKET MODAL -->
+    <div id="create-ticket-modal" class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-end sm:items-center justify-center fade-in backdrop-blur-sm">
+        <div class="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto sm:rounded-2xl rounded-t-[2rem] flex flex-col overflow-hidden shadow-2xl relative">
+            
+            <!-- Modal Handle for Mobile -->
+            <div class="absolute top-3 left-0 right-0 flex justify-center sm:hidden">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+            </div>
+
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10 pt-8 sm:pt-6">
+                <div>
+                    <h2 class="font-bold text-xl text-slate-800">Lapor Masalah</h2>
+                    <p class="text-xs text-slate-500 mt-1">Isi form di bawah ini dengan jelas.</p>
+                </div>
+                <button onclick="closeModal('create-ticket-modal')" class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"><i class="fas fa-times text-lg"></i></button>
+            </div>
+
+            <!-- Form Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 bg-white pb-24 sm:pb-6">
+                <!-- 1. Lokasi -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Lokasi Kejadian <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" class="peer sr-only">
+                            <div class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Studio 1 (Live)</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" class="peer sr-only">
+                            <div class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Studio 2</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" class="peer sr-only">
+                            <div class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Ruang Editing</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" class="peer sr-only">
+                            <div class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Kantor / Admin</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2. Urgensi -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Status Siaran <span class="text-red-500">*</span></label>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 p-3 border border-red-200 bg-red-50/50 rounded-xl cursor-pointer hover:bg-red-50 transition relative overflow-hidden group">
+                            <input type="radio" name="urgency" value="critical" class="w-5 h-5 text-red-600 focus:ring-red-500 border-red-300">
+                            <div>
+                                <h4 class="font-bold text-red-700 text-sm">Darurat Siaran (ON AIR)</h4>
+                                <p class="text-[10px] text-red-500">Pilih ini jika siaran sedang berlangsung & terganggu!</p>
+                            </div>
+                            <i class="fas fa-broadcast-tower absolute right-4 text-red-200 text-3xl group-hover:text-red-300 transition"></i>
+                        </label>
+                        
+                        <label class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
+                            <input type="radio" name="urgency" value="normal" class="w-5 h-5 text-blue-600 focus:ring-blue-500 border-slate-300">
+                            <div>
+                                <h4 class="font-bold text-slate-700 text-sm">Pra-Siaran / Kegiatan Kantor</h4>
+                                <p class="text-[10px] text-slate-400">Masalah menghambat kerja tapi tidak live.</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 3. Detail Masalah -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Kategori</label>
+                        <select class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <option>Audio (Mic, Mixer, Speaker)</option>
+                            <option>Video (Kamera, Monitor, Switcher)</option>
+                            <option>IT (PC, Internet, Wifi, Printer)</option>
+                            <option>Software (OBS, vMix, Prompter)</option>
+                            <option>Kelistrikan / AC</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Judul Masalah</label>
+                        <input type="text" placeholder="Contoh: Mic Clip-on mati mendadak" class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Deskripsi Detail</label>
+                        <textarea class="w-full p-3 border border-slate-300 rounded-xl text-sm h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="Jelaskan apa yang terjadi..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 4. Bukti Foto -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Lampiran Foto (Opsional)</label>
+                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition text-slate-400">
+                        <i class="fas fa-camera text-2xl mb-2"></i>
+                        <p class="text-xs">Klik untuk ambil foto / upload</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action -->
+            <div class="p-4 border-t border-slate-100 bg-white sticky bottom-0 z-10">
+                <button onclick="closeModal('create-ticket-modal'); alert('Laporan Terkirim! Teknisi segera meluncur.')" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2">
+                    <i class="fas fa-paper-plane"></i> Kirim Laporan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. TICKET DETAIL MODAL -->
+    <div id="ticket-detail-modal" class="hidden fixed inset-0 bg-white z-[70] flex flex-col mobile-frame fade-in">
+        <!-- Header -->
+        <div class="bg-white border-b border-slate-200 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
+            <button onclick="closeModal('ticket-detail-modal')" class="text-slate-500 hover:text-slate-800 transition"><i class="fas fa-arrow-left text-xl"></i></button>
+            <div class="flex-1">
+                <h3 class="font-bold text-slate-800 text-lg">#T-2099</h3>
+                <p class="text-xs text-purple-600 font-bold flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span> Open &bull; Printer Macet</p>
+            </div>
+        </div>
+        
+        <!-- Chat Area -->
+        <div class="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6">
+            
+            <!-- Big Book Suggestion Alert -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-xl shadow-sm flex gap-3 items-start">
+                <div class="bg-yellow-100 p-2 rounded-full"><i class="fas fa-lightbulb text-yellow-600"></i></div>
+                <div>
+                    <p class="text-xs text-blue-800 font-bold uppercase tracking-wide mb-1">Big Book Suggestion</p>
+                    <p class="text-sm text-slate-700 mb-2">Sistem mendeteksi kemiripan dengan artikel: <span class="font-bold">"Fix Error 505 Printer"</span>.</p>
+                    <button onclick="openModal('bigbook-modal')" class="text-xs bg-white border border-blue-300 px-3 py-1.5 rounded-lg text-blue-700 font-bold hover:bg-blue-50 transition shadow-sm">Buka Artikel</button>
+                </div>
+            </div>
+
+            <!-- Chat Bubbles -->
+            <div class="space-y-4">
+                <div class="flex gap-3">
+                    <img src="https://ui-avatars.com/api/?name=User&background=random" class="w-8 h-8 rounded-full shadow-sm">
+                    <div class="bg-white p-3 rounded-r-xl rounded-bl-xl shadow-sm text-sm border border-slate-200 text-slate-700 leading-relaxed max-w-[85%]">
+                        Mas tolong dicek, printer lantai 2 bunyi 'tek tek' terus kertasnya nyangkut di roll belakang.
+                        <span class="block text-[10px] text-slate-400 mt-2">08:45 AM</span>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <span class="text-[10px] text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-medium">Budi joined the ticket</span>
+                </div>
+
+                <div class="flex gap-3 flex-row-reverse">
+                    <img src="https://ui-avatars.com/api/?name=Budi&background=random" class="w-8 h-8 rounded-full shadow-sm">
+                    <div class="bg-blue-600 p-3 rounded-l-xl rounded-br-xl shadow-sm text-sm text-white leading-relaxed max-w-[85%]">
+                        Siap mbak, saya sedang meluncur ke lokasi. Jangan dipaksa tarik kertasnya ya.
+                        <span class="block text-[10px] text-blue-200 mt-2 text-right">08:50 AM</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="p-4 border-t border-slate-200 bg-white grid grid-cols-2 gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] relative z-20">
+             <button onclick="toggleHandoverForm()" class="bg-orange-50 border border-orange-200 text-orange-700 py-3 rounded-xl font-bold text-sm hover:bg-orange-100 transition flex items-center justify-center gap-2">
+                <i class="fas fa-people-arrows"></i> Handover
+             </button>
+             <button onclick="closeModal('ticket-detail-modal')" class="bg-green-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-green-700 transition shadow-lg shadow-green-200 flex items-center justify-center gap-2">
+                <i class="fas fa-check"></i> Selesai
+             </button>
+        </div>
+
+        <!-- Handover Form Overlay -->
+        <div id="handover-form" class="hidden absolute bottom-0 left-0 w-full bg-white rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 z-30 border-t border-orange-100 slide-up">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-bold text-orange-600 text-lg flex items-center gap-2"><i class="fas fa-exchange-alt"></i> Handover Shift</h3>
+                <button onclick="toggleHandoverForm()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Oper Ke Siapa?</label>
+                    <select class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option>Shift Siang (General Pool)</option>
+                        <option>Andi (Shift Siang) - Recommended</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Catatan Handover (Wajib)</label>
+                    <textarea class="w-full p-3 border border-slate-300 rounded-xl text-sm h-24 focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="Jelaskan progress terakhir dan kendala..."></textarea>
+                </div>
+                <button onclick="toggleHandoverForm(); closeModal('ticket-detail-modal'); alert('Tiket dioper ke Shift Siang')" class="w-full bg-orange-500 text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 shadow-md transition">
+                    Konfirmasi Handover
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================================================== -->
+    <!-- LOGIC -->
+    <!-- ================================================================== -->
+    <script>
+        // --- 1. VIEW SWITCHER LOGIC ---
+        function switchRole(role) {
+            // Hide all views
+            ['consumer', 'staff', 'manager'].forEach(r => {
+                document.getElementById('view-'+r).classList.add('hidden');
+                document.getElementById('btn-'+r).classList.remove('bg-blue-600', 'border-blue-400', 'text-white');
+                document.getElementById('btn-'+r).classList.add('bg-slate-700', 'text-white');
+                if(r === 'staff') document.getElementById('btn-'+r).classList.remove('border');
+            });
+            document.getElementById('view-'+role).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-'+role);
+            activeBtn.classList.remove('bg-slate-700');
+            activeBtn.classList.add('bg-blue-600', 'border', 'border-blue-400');
+        }
+
+        // --- 2. MANAGER TAB LOGIC (NEW) ---
+        function switchManagerTab(tabName) {
+            // Hide all manager content
+            ['dashboard', 'shifts', 'bigbook', 'performance'].forEach(t => {
+                document.getElementById('manager-content-'+t).classList.add('hidden');
+                // Reset Nav Style
+                const nav = document.getElementById('mgr-nav-'+t);
+                nav.classList.remove('bg-blue-600', 'text-white', 'shadow-lg');
+                nav.classList.add('text-slate-400');
+            });
+
+            // Show selected
+            document.getElementById('manager-content-'+tabName).classList.remove('hidden');
+            
+            // Highlight Nav
+            const activeNav = document.getElementById('mgr-nav-'+tabName);
+            activeNav.classList.remove('text-slate-400');
+            activeNav.classList.add('bg-blue-600', 'text-white', 'shadow-lg');
+        }
+
+        // --- 3. STAFF TAB LOGIC ---
+        function switchStaffTab(tabName) {
+            ['home', 'alerts', 'profile'].forEach(t => {
+                document.getElementById('staff-content-'+t).classList.add('hidden');
+                document.getElementById('nav-'+t).classList.remove('text-blue-600');
+                document.getElementById('nav-'+t).classList.add('text-slate-400');
+            });
+            document.getElementById('staff-content-'+tabName).classList.remove('hidden');
+            const activeBtn = document.getElementById('nav-'+tabName);
+            activeBtn.classList.remove('text-slate-400');
+            activeBtn.classList.add('text-blue-600');
+        }
+
+        // --- 4. MODAL LOGIC ---
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { 
+            document.getElementById(id).classList.add('hidden');
+            if(id === 'ticket-detail-modal') document.getElementById('handover-form').classList.add('hidden');
+        }
+        function toggleHandoverForm() {
+            const form = document.getElementById('handover-form');
+            form.classList.toggle('hidden');
+        }
+
+        // --- INITIALIZE ---
+        switchRole('manager'); // Default to Manager view to see new changes
+    </script>
+</body>
+</html>

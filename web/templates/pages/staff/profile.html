@@ -1,0 +1,202 @@
+```html
+{{ define "content" }}
+<!-- Cropper.js CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+
+<div class="max-w-[480px] mx-auto min-h-screen bg-white flex flex-col relative">
+    <!-- Header -->
+    <div class="bg-white p-4 flex items-center gap-4 border-b border-slate-100">
+        <a href="/staff" class="text-slate-400 hover:text-slate-800"><i class="fas fa-arrow-left text-xl"></i></a>
+        <h1 class="text-xl font-bold text-slate-800">Profil Saya</h1>
+    </div>
+
+    <!-- Edit Profile Form -->
+    <form id="profileForm" class="p-6 flex flex-col items-center w-full">
+        <!-- Avatar -->
+        <div class="relative mb-6 group cursor-pointer" onclick="document.getElementById('avatarInput').click()">
+            <img src="{{ if .user.AvatarURL }}{{ .user.AvatarURL }}?t={{ .now }}{{ else }}https://ui-avatars.com/api/?name={{ .user.FullName }}&background=0f172a&color=fff&size=200{{ end }}"
+                class="w-32 h-32 rounded-full shadow-xl border-4 border-white ring-2 ring-slate-100 object-cover group-hover:brightness-90 transition"
+                id="avatarPreview">
+            <div
+                class="absolute bottom-0 right-0 w-10 h-10 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center group-hover:bg-blue-700 transition border-2 border-white">
+                <i class="fas fa-camera"></i>
+            </div>
+            <input type="file" name="avatar" id="avatarInput" class="hidden" accept="image/*">
+        </div>
+
+        <!-- Name Input -->
+        <input type="text" name="fullname" id="fullnameInput" value="{{ .user.FullName }}"
+            class="text-2xl font-bold text-slate-800 text-center bg-transparent border-b-2 border-transparent focus:border-blue-500 focus:outline-none transition mb-1 w-full"
+            placeholder="Nama Lengkap">
+
+        <p class="text-slate-500 text-sm font-medium mb-6">{{ .user.Role }} &bull; {{ .user.Email }}</p>
+
+        <!-- Save Button -->
+        <button type="button" id="saveBtn"
+            class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold text-sm hover:bg-blue-700 shadow-md transition mb-8 flex items-center gap-2">
+            <i class="fas fa-save"></i> Simpan Profil
+        </button>
+    </form>
+
+    <div class="px-6 pb-6 w-full">
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-4 w-full mb-8">
+            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
+                <span class="block text-2xl font-bold text-blue-600">12</span>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tiket</span>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
+                <span class="block text-2xl font-bold text-green-600">95%</span>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">On-Time</span>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
+                <span class="block text-2xl font-bold text-indigo-600">8</span>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Shift</span>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="w-full space-y-3">
+            <button
+                class="w-full bg-white border border-slate-200 p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition group">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <span class="font-bold text-slate-700">Ganti Password</span>
+                </div>
+                <i class="fas fa-chevron-right text-slate-300"></i>
+            </button>
+            <a href="/auth/logout"
+                class="w-full bg-red-50 border border-red-100 p-4 rounded-xl flex items-center justify-between hover:bg-red-100 transition group mt-8">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-10 h-10 rounded-full bg-white text-red-500 flex items-center justify-center shadow-sm">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </div>
+                    <span class="font-bold text-red-600">Logout</span>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Image Cropper Modal -->
+<div id="cropperModal" class="hidden fixed inset-0 z-[60] bg-black/90 flex flex-col">
+    <div class="flex justify-between items-center p-4 text-white">
+        <h3 class="font-bold">Sesuaikan Foto</h3>
+        <button onclick="closeCropper()" class="text-white hover:text-red-400"><i
+                class="fas fa-times text-xl"></i></button>
+    </div>
+    <div class="flex-1 overflow-hidden bg-black flex items-center justify-center relative">
+        <img id="imageToCrop" src="" class="max-w-full max-h-full block">
+    </div>
+    <div class="p-4 bg-black flex justify-between items-center gap-4">
+        <button onclick="closeCropper()" class="px-6 py-2 text-white font-bold text-sm">Batal</button>
+        <button onclick="cropAndSave()"
+            class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-blue-700">Pilih
+            Foto</button>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script>
+    let cropper;
+    const avatarInput = document.getElementById('avatarInput');
+    const imageToCrop = document.getElementById('imageToCrop');
+    const modal = document.getElementById('cropperModal');
+    let croppedBlob = null;
+
+    avatarInput.addEventListener('change', function (e) {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+
+            // Size Check (2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                alert("Ukuran foto terlalu besar! Maksimal 2MB.");
+                this.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                imageToCrop.src = evt.target.result;
+                modal.classList.remove('hidden');
+
+                if (cropper) cropper.destroy();
+                cropper = new Cropper(imageToCrop, {
+                    aspectRatio: 1, // Square for avatar
+                    viewMode: 1,
+                    dragMode: 'move',
+                    autoCropArea: 0.8,
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function closeCropper() {
+        modal.classList.add('hidden');
+        avatarInput.value = ''; // Reset input so change event fires again if same file
+        if (cropper) cropper.destroy();
+    }
+
+    function cropAndSave() {
+        if (!cropper) return;
+
+        cropper.getCroppedCanvas({
+            width: 400, // Resize to reasonable avatar size
+            height: 400
+        }).toBlob((blob) => {
+            croppedBlob = blob;
+            // Update preview
+            const url = URL.createObjectURL(blob);
+            document.getElementById('avatarPreview').src = url;
+            closeCropper();
+
+            // IMPORTANT: We don't restore avatarInput value, because we will send 'croppedBlob' instead
+        }, 'image/jpeg', 0.8);
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', function () {
+        const formData = new FormData();
+        formData.append('fullname', document.getElementById('fullnameInput').value);
+
+        if (croppedBlob) {
+            formData.append('avatar', croppedBlob, 'avatar.jpg');
+        } else if (avatarInput.files[0]) {
+            // If user somehow selected file but bypassed crop (unlikely with this logic, but backup)
+            formData.append('avatar', avatarInput.files[0]);
+        }
+
+        // Show loading state
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+        btn.disabled = true;
+
+        fetch('/staff/profile/update', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert("Gagal menyimpan profil.");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Terjadi kesalahan.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+    });
+</script>
+{{ end }}
+```
