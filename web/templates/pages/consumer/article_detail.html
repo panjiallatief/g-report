@@ -1,0 +1,110 @@
+{{ define "content" }}
+<div class="max-w-[480px] mx-auto min-h-screen bg-f8fafc border-x border-slate-200 relative pb-24">
+    <!-- Header -->
+    <header class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6 shadow-xl sticky top-0 z-20">
+        <div class="flex items-center gap-4">
+            <a href="/consumer" class="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition text-white">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <h1 class="text-lg font-bold truncate">{{ .article.Title }}</h1>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="p-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-6 border-b border-slate-50 bg-slate-50/50">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase">{{
+                        .article.Category }}</span>
+                    <span class="text-slate-400 text-xs"><i class="fas fa-eye mr-1"></i> {{ .article.ViewsCount }}
+                        views</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 leading-tight">{{ .article.Title }}</h2>
+                <div class="flex items-center gap-2 mt-4 text-xs text-slate-500">
+                    <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span>{{ .article.Author.FullName }}</span> &bull;
+                    <span>{{ .article.CreatedAt.Format "02 Jan 2006" }}</span>
+                </div>
+            </div>
+
+            <div class="p-6 prose prose-slate prose-sm max-w-none">
+                {{ .article.Content }}
+            </div>
+        </div>
+
+        <div class="mt-8 text-center">
+            <p class="text-slate-400 text-sm mb-4">Masalah belum teratasi?</p>
+            <button onclick="document.getElementById('create-ticket-modal').classList.remove('hidden')"
+                class="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition">
+                <i class="fas fa-exclamation-triangle mr-2 text-red-400"></i> Lapor sebagai Masalah
+            </button>
+        </div>
+    </div>
+
+    <!-- Re-use Ticket Modal from Dashboard if possible, or copy it. 
+         Since this is a separate page, we usually need to Copy the Modal code or use a partial.
+         For simplicity/speed, I will Duplicate the Modal code here to ensure functionality without refactoring layouts yet. 
+    -->
+    <!-- 3. CREATE TICKET MODAL COPY -->
+    <div id="create-ticket-modal"
+        class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-end sm:items-center justify-center fade-in backdrop-blur-sm">
+        <div
+            class="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto sm:rounded-2xl rounded-t-[2rem] flex flex-col overflow-hidden shadow-2xl relative">
+            <div
+                class="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10 pt-8 sm:pt-6">
+                <div>
+                    <h2 class="font-bold text-xl text-slate-800">Lapor Masalah</h2>
+                    <p class="text-xs text-slate-500 mt-1">Lanjutkan pelaporan jika artikel tidak membantu.</p>
+                </div>
+                <button onclick="document.getElementById('create-ticket-modal').classList.add('hidden')"
+                    class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"><i
+                        class="fas fa-times text-lg"></i></button>
+            </div>
+            <form action="/consumer/ticket" method="POST"
+                class="flex-1 overflow-y-auto p-6 space-y-6 bg-white pb-24 sm:pb-6">
+                <!-- Simplified fields for context -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Lokasi Kejadian
+                        <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" value="STUDIO_1" class="peer sr-only" required>
+                            <div
+                                class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Studio 1</span></div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="location" value="OFFICE" class="peer sr-only">
+                            <div
+                                class="p-3 border border-slate-200 rounded-xl text-center hover:bg-blue-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                                <span class="text-sm font-bold">Kantor</span></div>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Judul
+                        Masalah</label>
+                    <input type="text" name="subject" required value="Issue regarding: {{ .article.Title }}"
+                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Deskripsi
+                        Detail</label>
+                    <textarea name="description" required
+                        class="w-full p-3 border border-slate-300 rounded-xl text-sm h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                        placeholder="Jelaskan apa yang terjadi..."></textarea>
+                </div>
+                <div class="p-4 border-t border-slate-100 bg-white sticky bottom-0 z-10 -mx-6 -mb-6">
+                    <button type="submit"
+                        class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2">
+                        <i class="fas fa-paper-plane"></i> Kirim Laporan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}

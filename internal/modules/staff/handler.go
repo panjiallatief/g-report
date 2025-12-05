@@ -25,6 +25,7 @@ func RegisterRoutes(r *gin.Engine) {
 		staffGroup.POST("/routine/:id/toggle", ToggleRoutineItem)
 		staffGroup.GET("/bigbook", BigBook)
 		staffGroup.GET("/bigbook/search", SearchBigBookJSON)
+		staffGroup.GET("/articles/:id", ArticleDetail)
 		staffGroup.GET("/profile", Profile)
 		staffGroup.GET("/alerts", Alerts)
 		staffGroup.POST("/profile/update", UpdateProfile)
@@ -347,4 +348,22 @@ func UpdateProfile(c *gin.Context) {
 
 	database.DB.Save(&user)
 	c.Status(http.StatusOK)
+}
+
+
+func ArticleDetail(c *gin.Context) {
+	id := c.Param("id")
+	var article models.KnowledgeArticle
+	if result := database.DB.Preload("Author").First(&article, "id = ?", id); result.Error != nil {
+		c.Data(404, "text/html; charset=utf-8", []byte("<h1>Article not found</h1>"))
+		return
+	}
+
+	// Increment View Count
+	database.DB.Model(&article).UpdateColumn("views_count", article.ViewsCount+1)
+
+	c.HTML(http.StatusOK, "staff/article_detail.html", gin.H{
+		"title":   article.Title,
+		"article": article,
+	})
 }

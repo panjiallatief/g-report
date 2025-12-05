@@ -32,9 +32,9 @@
     </header>
 
     <!-- Main Action Buttons -->
-    <div class="p-6 grid grid-cols-2 gap-4 -mt-2">
+    <div class="p-6 grid grid-cols-2 gap-4 -mt-2 slide-up">
         <button onclick="document.getElementById('create-ticket-modal').classList.remove('hidden')"
-            class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover:bg-red-50 hover:border-red-200 transition group active:scale-95 transform">
+            class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover-scale hover:bg-red-50 hover:border-red-200 transition group active:scale-95 transform">
             <div
                 class="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition shadow-sm">
                 <i class="fas fa-exclamation-triangle"></i>
@@ -42,7 +42,7 @@
             <span class="text-sm font-bold text-slate-700">Lapor Masalah</span>
         </button>
         <button onclick="document.getElementById('bigbook-modal').classList.remove('hidden')"
-            class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover:bg-indigo-50 hover:border-indigo-200 transition group active:scale-95 transform">
+            class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover-scale hover:bg-indigo-50 hover:border-indigo-200 transition group active:scale-95 transform">
             <div
                 class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition shadow-sm">
                 <i class="fas fa-book-reader"></i>
@@ -110,7 +110,7 @@
         <!-- Content -->
         <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
             <template x-for="article in articles" :key="article.ID">
-                <div
+                <div @click="window.location.href='/consumer/articles/' + article.ID"
                     class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
                     <div class="flex justify-between items-start mb-2">
                         <h3 class="font-bold text-blue-700 text-lg group-hover:underline" x-text="article.Title"></h3>

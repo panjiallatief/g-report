@@ -23,6 +23,10 @@
                 class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer">
                 <i class="fas fa-users-cog w-5 text-center"></i> Staff Performance
             </a>
+            <a href="javascript:void(0)" onclick="switchManagerTab('routines')" id="mgr-nav-routines"
+                class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer">
+                <i class="fas fa-clipboard-list w-5 text-center"></i> Routines
+            </a>
             <a href="/auth/logout"
                 class="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-200 hover:bg-slate-800 rounded-lg transition cursor-pointer mt-8">
                 <i class="fas fa-sign-out-alt w-5 text-center"></i> Logout
@@ -34,7 +38,8 @@
     <main class="p-8 max-w-7xl mx-auto">
 
         <!-- 3.1 DASHBOARD HOME -->
-        <div id="manager-content-dashboard" class="fade-in">
+        <!-- 3.1 DASHBOARD HOME -->
+        <div id="manager-content-dashboard" class="fade-in slide-up">
             <div class="flex justify-between items-center mb-8">
                 <div>
                     <h2 class="text-2xl font-bold text-slate-800">Operational Dashboard</h2>
@@ -55,7 +60,7 @@
             <!-- KPI Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <!-- MTTA -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500">
+                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500 hover-scale cursor-default">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Response (MTTA)</p>
                     <div class="mt-2 flex items-baseline gap-2">
                         <span class="text-3xl font-bold text-slate-800">{{ .mtta }}m</span>
@@ -64,7 +69,7 @@
                     </div>
                 </div>
                 <!-- MTTR -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500">
+                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500 hover-scale cursor-default">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Resolution (MTTR)</p>
                     <div class="mt-2 flex items-baseline gap-2">
                         <span class="text-3xl font-bold text-slate-800">{{ .mttr }}m</span>
@@ -88,6 +93,64 @@
                         <span class="text-xs text-blue-500 font-bold bg-blue-50 px-1.5 py-0.5 rounded">+{{
                             .newArticlesCount }} Pending</span>
                         {{ end }}
+                    </div>
+                </div>
+
+                <!-- SLA Compliance Section -->
+                <div class="grid grid-cols-1 gap-8 w-full" style="animation-delay: 100ms;">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i
+                            class="fas fa-clipboard-check text-blue-500"></i> SLA Compliance Report</h3>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead
+                                class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-xs">
+                                <tr>
+                                    <th class="p-4">Category</th>
+                                    <th class="p-4">Target (Res)</th>
+                                    <th class="p-4 text-center">Total Tickets</th>
+                                    <th class="p-4 text-center">Compliant</th>
+                                    <th class="p-4 text-center">Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {{ range .slaMetrics }}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="p-4 font-bold text-slate-700">
+                                        {{ if eq .Priority "URGENT_ON_AIR" }}
+                                        <span class="text-red-600"><i class="fas fa-broadcast-tower mr-2 w-4"></i>Urgent
+                                            (On Air)</span>
+                                        {{ else }}
+                                        <span class="text-blue-600"><i class="fas fa-briefcase mr-2 w-4"></i>Normal /
+                                            High</span>
+                                        {{ end }}
+                                    </td>
+                                    <td class="p-4 text-slate-500 text-xs">
+                                        {{ if eq .Priority "URGENT_ON_AIR" }} < 15 Mins {{ else }} < 8 Hours {{ end }}
+                                            </td>
+                                    <td class="p-4 text-center text-slate-800 font-bold">{{ .TotalTickets }}</td>
+                                    <td class="p-4 text-center text-green-600 font-bold">{{ .CompliantTickets }}</td>
+                                    <td class="p-4 text-center">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <span
+                                                class="font-bold {{ if ge .ComplianceRate 90.0 }}text-green-600{{ else if ge .ComplianceRate 75.0 }}text-yellow-600{{ else }}text-red-600{{ end }}">
+                                                {{ printf "%.1f" .ComplianceRate }}%
+                                            </span>
+                                            <!-- Progress Bar -->
+                                            <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div class="h-full {{ if ge .ComplianceRate 90.0 }}bg-green-500{{ else if ge .ComplianceRate 75.0 }}bg-yellow-500{{ else }}bg-red-500{{ end }}"
+                                                    style="width: {{ .ComplianceRate }} %"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="5" class="p-6 text-center text-slate-400 italic">No tickets to analyze
+                                        yet.</td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -362,6 +425,55 @@
             </div>
         </div>
 
+        <!-- 3.5 ROUTINES CONTENT (New Tab) -->
+        <div id="manager-content-routines" class="hidden fade-in slide-up">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Routine Management</h2>
+                    <p class="text-slate-500 text-sm">Manage recurring tasks and checklists.</p>
+                </div>
+                <button onclick="openModal('new-routine-modal')"
+                    class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
+                    <i class="fas fa-plus mr-2"></i> New Routine
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4">Title</th>
+                            <th class="px-6 py-4">Schedule (Cron)</th>
+                            <th class="px-6 py-4">Deadline</th>
+                            <th class="px-6 py-4 text-center">Active</th>
+                            <th class="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {{ range .routineTemplates }}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-6 py-4 font-bold text-slate-800">{{ .Title }}</td>
+                            <td class="px-6 py-4 font-mono text-xs bg-slate-50 rounded text-slate-600">{{ .CronSchedule
+                                }}</td>
+                            <td class="px-6 py-4">{{ .DeadlineMinutes }} mins</td>
+                            <td class="px-6 py-4 text-center">
+                                <span
+                                    class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">ACTIVE</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <button class="text-blue-600 hover:text-blue-800 font-bold text-xs">Edit</button>
+                            </td>
+                        </tr>
+                        {{ else }}
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-slate-400">No routines defined.</td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- NEW SHIFT MODAL (Manager Only) -->
         <div id="new-shift-modal"
             class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm">
@@ -410,6 +522,117 @@
                         Save Schedule
                     </button>
                 </form>
+
+                </form>
+            </div>
+        </div>
+
+        <!-- NEW ROUTINE MODAL -->
+        <div id="new-routine-modal"
+            class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
+            x-data="{ freq: 'DAILY', checklist: [''] }">
+            <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">New Routine</h3>
+                    <button onclick="closeModal('new-routine-modal')"
+                        class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button>
+                </div>
+
+                <form action="/manager/routines/create" method="POST"
+                    class="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+
+                    <!-- Title -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Routine
+                            Title</label>
+                        <input type="text" name="title" required placeholder="e.g. Daily Studio Check"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <!-- Frequency & Time Row -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Frequency</label>
+                            <select name="frequency" x-model="freq"
+                                class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="DAILY">Daily</option>
+                                <option value="WEEKLY">Weekly</option>
+                                <option value="MONTHLY">Monthly</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Time</label>
+                            <input type="time" name="time" required
+                                class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Conditional Day Inputs -->
+                    <div x-show="freq === 'WEEKLY'" class="slide-up">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day of
+                            Week</label>
+                        <select name="day_week"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                        </select>
+                    </div>
+
+                    <div x-show="freq === 'MONTHLY'" class="slide-up">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day of
+                            Month</label>
+                        <input type="number" name="day_month" min="1" max="31" placeholder="1-31"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <!-- Deadline -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Submission
+                            Deadline (Mins)</label>
+                        <input type="number" name="deadline_minutes" value="30"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <!-- Dynamic Checklist -->
+                    <div class="pt-2 border-t border-slate-100">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide">Checklist
+                                Items</label>
+                            <button type="button" @click="checklist.push('')"
+                                class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-100 transition">
+                                <i class="fas fa-plus mr-1"></i> Add Item
+                            </button>
+                        </div>
+
+                        <div class="space-y-2">
+                            <template x-for="(item, index) in checklist" :key="index">
+                                <div class="flex gap-2 slide-up">
+                                    <input type="text" name="checklist_items" x-model="checklist[index]"
+                                        placeholder="Task description..." required
+                                        class="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-600">
+                                    <button type="button"
+                                        @click="checklist.length > 1 ? checklist.splice(index, 1) : null"
+                                        class="text-slate-400 hover:text-red-500 px-2 transition"
+                                        :class="{'opacity-50 cursor-not-allowed': checklist.length <= 1}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4 hover-scale">
+                        Create Routine
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -419,7 +642,7 @@
 <script>
     function switchManagerTab(tabName) {
         // Hide all manager content
-        ['dashboard', 'shifts', 'bigbook', 'performance'].forEach(t => {
+        ['dashboard', 'shifts', 'bigbook', 'performance', 'routines'].forEach(t => {
             const el = document.getElementById('manager-content-' + t);
             if (el) el.classList.add('hidden');
 

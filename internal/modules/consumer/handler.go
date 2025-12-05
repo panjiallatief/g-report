@@ -16,6 +16,7 @@ func RegisterRoutes(r *gin.Engine) {
 	{
 		consumerGroup.GET("", Dashboard)
 		consumerGroup.GET("/bigbook", SearchBigBook)
+		consumerGroup.GET("/articles/:id", ArticleDetail)
 		consumerGroup.POST("/ticket", CreateTicket)
 	}
 }
@@ -47,6 +48,23 @@ func SearchBigBook(c *gin.Context) {
 	}
 	
 	c.JSON(200, articles)
+}
+
+func ArticleDetail(c *gin.Context) {
+	id := c.Param("id")
+	var article models.KnowledgeArticle
+	if result := database.DB.Preload("Author").First(&article, "id = ?", id); result.Error != nil {
+		c.Data(404, "text/html; charset=utf-8", []byte("<h1>Article not found</h1>"))
+		return
+	}
+
+	// Increment View Count
+	database.DB.Model(&article).UpdateColumn("views_count", article.ViewsCount+1)
+
+	c.HTML(http.StatusOK, "consumer/article_detail.html", gin.H{
+		"title":   article.Title,
+		"article": article,
+	})
 }
 
 func CreateTicket(c *gin.Context) {

@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"strconv"
+	"fmt"
+	"encoding/json"
 	"it-broadcast-ops/internal/auth"
 )
 
@@ -22,6 +25,7 @@ func RegisterRoutes(r *gin.Engine) {
 	managerGroup.GET("", Dashboard)
 	managerGroup.POST("/articles/:id/verify", VerifyArticle)
 	managerGroup.POST("/shifts/import", ImportSchedule)
+	managerGroup.POST("/routines/create", CreateRoutine)
 	}
 }
 
@@ -94,6 +98,45 @@ func Dashboard(c *gin.Context) {
 		fcrRate = (float64(fcrCount) / float64(totalResolved)) * 100
 	}
 
+	// SLA Compliance Stats
+	type SLAMetric struct {
+		Priority         string
+		TotalTickets     int
+		CompliantTickets int
+		ComplianceRate   float64
+	}
+	var slaMetrics []SLAMetric
+
+	// Query for Urgent (15 mins)
+	var urgentStats SLAMetric
+	database.DB.Raw(`
+		SELECT 
+			'URGENT_ON_AIR' as priority,
+			COUNT(*) as total_tickets,
+			COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (resolved_at - created_at))/60 <= 15) as compliant_tickets
+		FROM tickets 
+		WHERE priority = 'URGENT_ON_AIR' AND status IN ('RESOLVED', 'CLOSED')
+	`).Scan(&urgentStats)
+	if urgentStats.TotalTickets > 0 {
+		urgentStats.ComplianceRate = (float64(urgentStats.CompliantTickets) / float64(urgentStats.TotalTickets)) * 100
+	}
+	slaMetrics = append(slaMetrics, urgentStats)
+
+	// Query for Normal (8 Hours = 480 mins)
+	var normalStats SLAMetric
+	database.DB.Raw(`
+		SELECT 
+			'NORMAL' as priority,
+			COUNT(*) as total_tickets,
+			COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (resolved_at - created_at))/60 <= 480) as compliant_tickets
+		FROM tickets 
+		WHERE priority IN ('NORMAL', 'HIGH') AND status IN ('RESOLVED', 'CLOSED')
+	`).Scan(&normalStats)
+	if normalStats.TotalTickets > 0 {
+		normalStats.ComplianceRate = (float64(normalStats.CompliantTickets) / float64(normalStats.TotalTickets)) * 100
+	}
+	slaMetrics = append(slaMetrics, normalStats)
+
 	// Big Book Stats
 	var articleCount int64
 	var newArticlesCount int64
@@ -148,12 +191,16 @@ func Dashboard(c *gin.Context) {
 
 	// 4. ACTIVE SHIFT (Currently On Duty)
 	var activeShift models.Shift
-	var hasActiveShift bool
-	if err := database.DB.Preload("User").
-		Where("start_time <= ? AND end_time >= ?", now, now).
-		First(&activeShift).Error; err == nil {
-		hasActiveShift = true
-	}
+	nowTime := time.Now()
+	// Check strictly active now
+	database.DB.Preload("User").
+		Where("start_time <= ? AND end_time >= ?", nowTime, nowTime).
+		Order("start_time desc").
+		First(&activeShift)
+
+	hasActiveShift := activeShift.ID != uuid.Nil
+
+
 
 	// 5. PUBLISHED ARTICLES (Top 5 by views)
 	var publishedArticles []models.KnowledgeArticle
@@ -204,6 +251,10 @@ func Dashboard(c *gin.Context) {
 	var allStaff []models.User
 	database.DB.Where("role = ?", models.RoleStaff).Find(&allStaff)
 
+	// 8. ROUTINE TEMPLATES
+	var routineTemplates []models.RoutineTemplate
+	database.DB.Find(&routineTemplates)
+
 	c.HTML(http.StatusOK, "manager/dashboard.html", gin.H{
 		"title": "Manager Dashboard",
 		"mtta": int(mtta),
@@ -218,6 +269,8 @@ func Dashboard(c *gin.Context) {
 		"publishedArticles": publishedArticles,
 		"staffPerformance": staffPerformance,
 		"allStaff": allStaff,
+		"slaMetrics": slaMetrics,
+		"routineTemplates": routineTemplates,
 	})
 }
 
@@ -289,5 +342,76 @@ func ImportSchedule(c *gin.Context) {
 func VerifyArticle(c *gin.Context) {
 	id := c.Param("id")
 	database.DB.Model(&models.KnowledgeArticle{}).Where("id = ?", id).Update("is_verified", true)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+func CreateRoutine(c *gin.Context) {
+	title := c.PostForm("title")
+	deadlineStr := c.PostForm("deadline_minutes")
+	
+	// Cron Construction Inputs
+	freq := c.PostForm("frequency") // DAILY, WEEKLY, MONTHLY
+	timeStr := c.PostForm("time")   // HH:MM
+	dayWeek := c.PostForm("day_week") // 0-6
+	dayMonth := c.PostForm("day_month") // 1-31
+
+	// Checklist
+	checklistItems := c.PostFormArray("checklist_items")
+
+	// Get User (Manager)
+	userIDStr, err := c.Cookie("user_id")
+	if err != nil {
+		c.Redirect(http.StatusFound, "/auth/login")
+		return
+	}
+
+	if title == "" || freq == "" || timeStr == "" {
+		c.Redirect(http.StatusFound, "/manager?error=MissingFields")
+		return
+	}
+
+	// 1. Construct Cron
+	// Format: Minute Hour Day Month DayOfWeek
+	// Time: HH:MM
+	parts := strings.Split(timeStr, ":")
+	if len(parts) != 2 {
+		c.Redirect(http.StatusFound, "/manager?error=InvalidTime")
+		return
+	}
+	hour := parts[0]
+	minute := parts[1]
+
+	var cron string
+	switch freq {
+	case "DAILY":
+		cron = fmt.Sprintf("%s %s * * *", minute, hour)
+	case "WEEKLY":
+		if dayWeek == "" { dayWeek = "1" } // Default Monday
+		cron = fmt.Sprintf("%s %s * * %s", minute, hour, dayWeek)
+	case "MONTHLY":
+		if dayMonth == "" { dayMonth = "1" }
+		cron = fmt.Sprintf("%s %s %s * *", minute, hour, dayMonth)
+	default:
+		cron = fmt.Sprintf("%s %s * * *", minute, hour)
+	}
+
+	deadline := 30
+	if d, err := strconv.Atoi(deadlineStr); err == nil {
+		deadline = d
+	}
+
+	// 2. Marshal Checklist
+	checklistJSON, _ := json.Marshal(checklistItems)
+
+	tpl := models.RoutineTemplate{
+		Title:           title,
+		CronSchedule:    cron,
+		DeadlineMinutes: deadline,
+		IsActive:        true,
+		CreatedBy:       uuid.MustParse(userIDStr),
+		ChecklistItems:  checklistJSON,
+	}
+	
+	database.DB.Create(&tpl)
 	c.Redirect(http.StatusFound, "/manager")
 }

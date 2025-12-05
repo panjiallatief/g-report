@@ -23,12 +23,57 @@
             animation: fadeIn 0.3s ease-in-out;
         }
 
+        .slide-up {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        .hover-scale {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+
+        /* Staggered animation delay for children (up to 10 items) */
+        .stagger-1 {
+            animation-delay: 100ms;
+        }
+
+        .stagger-2 {
+            animation-delay: 200ms;
+        }
+
+        .stagger-3 {
+            animation-delay: 300ms;
+        }
+
+        .stagger-4 {
+            animation-delay: 400ms;
+        }
+
+        .stagger-5 {
+            animation-delay: 500ms;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
             }
 
             to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
                 opacity: 1;
             }
         }
