@@ -4,6 +4,7 @@ import (
 	"it-broadcast-ops/internal/auth"
 	"it-broadcast-ops/internal/database"
 	"it-broadcast-ops/internal/models"
+	"it-broadcast-ops/internal/notification"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -143,6 +144,23 @@ func CreateTicket(c *gin.Context) {
 	if err := database.DB.Create(&ticket).Error; err != nil {
 		c.JSON(500, gin.H{"error": "Failed to create ticket: " + err.Error()})
 		return
+	}
+
+	
+	// [PUSH NOTIFICATION TRIGGER]
+	if ticket.Priority == models.PriorityUrgentOnAir {
+		go notification.SendBroadcastToStaff(
+			"🔥 URGENT: " + string(ticket.Location),
+			ticket.Subject + " (ON AIR ISSUE)",
+			"/staff/tickets/" + ticket.ID.String(),
+		)
+	} else {
+		// Notif biasa (Opsional)
+		go notification.SendBroadcastToStaff(
+			"New Ticket: " + string(ticket.Location),
+			ticket.Subject,
+			"/staff/tickets/" + ticket.ID.String(),
+		)
 	}
 
 	// Redirect back to dashboard with success message (or just reload)

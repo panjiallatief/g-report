@@ -14,6 +14,7 @@ import (
 	"it-broadcast-ops/internal/modules/consumer"
 	"it-broadcast-ops/internal/modules/manager"
 	"it-broadcast-ops/internal/modules/staff"
+	"it-broadcast-ops/internal/modules/notification"
 	"it-broadcast-ops/internal/utils"
 )
 
@@ -60,6 +61,7 @@ func NewRouter() *gin.Engine {
 	consumer.RegisterRoutes(r)
 	staff.RegisterRoutes(r)
 	manager.RegisterRoutes(r)
+	notification.RegisterRoutes(r) 
 
 	r.GET("/seed", func(c *gin.Context) {
 		utils.SeedDatabase(c)
