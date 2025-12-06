@@ -28,6 +28,8 @@ func RegisterRoutes(r *gin.Engine) {
 		
 		// Routine Routes
 		managerGroup.POST("/routines/create", CreateRoutine)
+		managerGroup.POST("/routines/:id/delete", DeleteRoutine) // NEW
+		managerGroup.POST("/routines/:id/toggle-active", ToggleRoutine) // NEW
 
 		// Big Book Routes
 		managerGroup.GET("/articles/:id/json", GetArticleJSON) 
@@ -212,7 +214,7 @@ func Dashboard(c *gin.Context) {
 	database.DB.Preload("Requester").
 		Where("status = ? AND solution != '' AND is_converted_to_article = ?", models.StatusResolved, false).
 		Order("resolved_at desc").
-		Limit(10).
+		Limit(5).
 		Find(&candidateTickets)
 	
 
@@ -608,5 +610,36 @@ func CreateRoutine(c *gin.Context) {
 	}
 	
 	database.DB.Create(&tpl)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+
+// NEW: DeleteRoutine
+func DeleteRoutine(c *gin.Context) {
+	id := c.Param("id")
+	// Only delete the template, or soft delete if you prefer
+	database.DB.Delete(&models.RoutineTemplate{}, "id = ?", id)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+// NEW: ToggleRoutine
+func ToggleRoutine(c *gin.Context) {
+	id := c.Param("id")
+	// Toggle the active state
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		c.Redirect(http.StatusFound, "/manager?error=InvalidID")
+		return
+	}
+
+	var routine models.RoutineTemplate
+	if err := database.DB.Select("is_active").Where("id = ?", parsedID).First(&routine).Error; err != nil {
+		c.Redirect(http.StatusFound, "/manager?error=RoutineNotFound")
+		return
+	}
+
+	// Toggle the active state
+	newActiveState := !routine.IsActive
+	database.DB.Model(&models.RoutineTemplate{}).Where("id = ?", parsedID).Update("is_active", newActiveState)
 	c.Redirect(http.StatusFound, "/manager")
 }

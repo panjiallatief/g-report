@@ -1,4 +1,5 @@
 email,label,start_time,end_time
+it2@example.com, Shift Malam,2025-12-06 15:00,2025-12-06 23:00
 it@example.com,WFH,2025-12-07 09:00,2025-12-07 17:00
 it2@example.com, Shift Pagi,2025-12-07 07:00,2025-12-07 15:00
 it@example.com, Shift Malam,2025-12-07 15:00,2025-12-07 23:00

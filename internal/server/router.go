@@ -46,7 +46,8 @@ func NewRouter() *gin.Engine {
 	// Load Templates
 
 	r.NoRoute(func(c *gin.Context) {
-		c.HTML(http.StatusNotFound, "pages/errors/404.html", gin.H{
+        // PERBAIKAN: Gunakan "pages/error/404.html" (tunggal)
+		c.HTML(http.StatusNotFound, "pages/error/404.html", gin.H{
 			"title": "Page Not Found",
 		})
 	})
