@@ -81,6 +81,26 @@
             </a>
         </div>
     </div>
+    <!-- BOTTOM NAV (IT STAFF) -->
+    <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-slate-200 flex justify-around py-3 px-2 text-[10px] font-bold text-slate-400 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
+        <a href="/staff" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
+            <i class="fas fa-home text-lg"></i> Home
+        </a>
+        <a href="/staff/alerts" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition relative">
+            <i class="fas fa-bell text-lg"></i> Alert
+            {{ if .urgentCount }}
+                {{ if gt .urgentCount 0 }}
+                <span class="absolute top-0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                {{ end }}
+            {{ end }}
+        </a>
+        <a href="/staff/history" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
+            <i class="fas fa-history text-lg"></i> History
+        </a>
+        <a href="/staff/profile" class="flex flex-col items-center gap-1.5 text-blue-600 w-16 transition">
+            <i class="fas fa-user text-lg"></i> Profile
+        </a>
+    </nav>
 </div>
 
 <!-- Image Cropper Modal -->

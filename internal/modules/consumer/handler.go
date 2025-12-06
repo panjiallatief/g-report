@@ -21,6 +21,10 @@ func RegisterRoutes(r *gin.Engine) {
 		consumerGroup.GET("/bigbook", SearchBigBook)
 		consumerGroup.GET("/articles/:id", ArticleDetail)
 		consumerGroup.POST("/ticket", CreateTicket)
+
+		// New Endpoints for Ticket Chat
+		consumerGroup.GET("/tickets/:id/details", GetTicketDetailJSON)
+		consumerGroup.POST("/tickets/:id/reply", ReplyTicket)
 	}
 }
 
@@ -42,16 +46,27 @@ func Dashboard(c *gin.Context) {
 	})
 }
 
+// SearchBigBook updated to return alphabetical list if query is empty
 func SearchBigBook(c *gin.Context) {
 	query := c.Query("q")
 	var articles []models.KnowledgeArticle
 	
+	db := database.DB.Model(&models.KnowledgeArticle{}).Where("is_verified = ?", true)
+
 	if query != "" {
-		database.DB.Where("title ILIKE ? OR content ILIKE ?", "%"+query+"%", "%"+query+"%").Limit(10).Find(&articles)
+		// Jika ada search, cari berdasarkan judul atau konten
+		db = db.Where("title ILIKE ? OR content ILIKE ?", "%"+query+"%", "%"+query+"%")
+	} else {
+		// Jika kosong, urutkan A-Z (Alphabetical)
+		db = db.Order("title ASC")
 	}
+
+	// Limit results to keep payload light
+	db.Limit(50).Find(&articles)
 	
 	c.JSON(200, articles)
 }
+
 
 func ArticleDetail(c *gin.Context) {
 	id := c.Param("id")
@@ -131,5 +146,91 @@ func CreateTicket(c *gin.Context) {
 	}
 
 	// Redirect back to dashboard with success message (or just reload)
+	c.Redirect(http.StatusFound, "/consumer")
+}
+
+
+// NEW: Get Ticket Details & Activities (JSON for AlpineJS)
+func GetTicketDetailJSON(c *gin.Context) {
+	id := c.Param("id")
+	var ticket models.Ticket
+	
+	// Fetch Ticket
+	if err := database.DB.Preload("Requester").First(&ticket, "id = ?", id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "Ticket not found"})
+		return
+	}
+
+	// Fetch Activities (Chat History)
+	var activities []models.TicketActivity
+	database.DB.Preload("Actor").
+		Where("ticket_id = ?", id).
+		Order("created_at asc").
+		Find(&activities)
+
+	// Custom JSON Response to simplify frontend handling
+	type ActivityView struct {
+		ActorName   string
+		ActorAvatar string
+		ActionType  string
+		Note        string
+		Time        string
+		IsMe        bool
+	}
+	
+	var activityViews []ActivityView
+	userIDStr, _ := c.Cookie("user_id")
+
+	// Add Initial Description as first "Chat"
+	activityViews = append(activityViews, ActivityView{
+		ActorName:   ticket.Requester.FullName,
+		ActorAvatar: ticket.Requester.AvatarURL,
+		ActionType:  "CREATED",
+		Note:        ticket.Description,
+		Time:        ticket.CreatedAt.Format("15:04"),
+		IsMe:        ticket.RequesterID.String() == userIDStr,
+	})
+
+	for _, act := range activities {
+		activityViews = append(activityViews, ActivityView{
+			ActorName:   act.Actor.FullName,
+			ActorAvatar: act.Actor.AvatarURL,
+			ActionType:  act.ActionType,
+			Note:        act.Note,
+			Time:        act.CreatedAt.Format("02 Jan 15:04"),
+			IsMe:        act.ActorID.String() == userIDStr,
+		})
+	}
+
+	c.JSON(200, gin.H{
+		"ticket": ticket,
+		"activities": activityViews,
+	})
+}
+
+// NEW: Reply to Ticket (Consumer Side)
+func ReplyTicket(c *gin.Context) {
+	id := c.Param("id")
+	message := c.PostForm("message")
+	userIDStr, _ := c.Cookie("user_id")
+	userID, _ := uuid.Parse(userIDStr)
+
+	if message == "" {
+		c.Redirect(http.StatusFound, "/consumer")
+		return
+	}
+
+	activity := models.TicketActivity{
+		TicketID:   uuid.MustParse(id),
+		ActorID:    userID,
+		ActionType: "REPLY",
+		Note:       message,
+		CreatedAt:  time.Now(),
+	}
+	database.DB.Create(&activity)
+
+	// Jika tiket sudah resolved tapi user membalas, mungkin perlu di-reopen?
+	// Untuk sekarang biarkan statusnya tetap, notifikasi akan masuk ke staff.
+	
 	c.Redirect(http.StatusFound, "/consumer")
 }

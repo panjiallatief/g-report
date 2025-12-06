@@ -14,11 +14,46 @@ import (
 	"github.com/google/uuid"
 )
 
+
+// 1. History Handler (UPDATED: Menggunakan TicketActivity & Kirim urgentCount)
+func History(c *gin.Context) {
+	userIDStr, _ := c.Cookie("user_id")
+	userID, _ := uuid.Parse(userIDStr) // Parse UUID untuk query activity
+
+	// A. Hitung Urgent Count untuk Navigasi
+	var urgentCount int64
+	database.DB.Model(&models.Ticket{}).
+		Where("priority = ? AND status != ?", models.PriorityUrgentOnAir, models.StatusResolved).
+		Count(&urgentCount)
+	
+	// B. Cari ID Tiket yang DI-RESOLVE oleh User ini (Dari tabel activity)
+	var ticketIDs []uuid.UUID
+	database.DB.Model(&models.TicketActivity{}).
+		Where("actor_id = ? AND action_type = ?", userID, "RESOLVE").
+		Pluck("ticket_id", &ticketIDs)
+
+	var resolvedTickets []models.Ticket
+	if len(ticketIDs) > 0 {
+		// Ambil detail tiket berdasarkan ID yang ditemukan
+		database.DB.Where("id IN ?", ticketIDs).
+			Preload("Requester").
+			Order("resolved_at desc").
+			Find(&resolvedTickets)
+	}
+
+	c.HTML(http.StatusOK, "staff/history.html", gin.H{
+		"title":       "Riwayat Pekerjaan",
+		"tickets":     resolvedTickets,
+		"urgentCount": urgentCount, // Penting untuk badge notifikasi merah di nav
+	})
+}
+
 func RegisterRoutes(r *gin.Engine) {
 	staffGroup := r.Group("/staff")
 	staffGroup.Use(auth.AuthRequired(), auth.RoleRequired(models.RoleStaff))
 	{
 		staffGroup.GET("", Dashboard)
+		staffGroup.GET("/history", History)
 		staffGroup.GET("/tickets/:id", TicketDetail)
 		staffGroup.POST("/tickets/:id/handover", HandoverTicket)
 		staffGroup.POST("/tickets/:id/resolve", ResolveTicket)
@@ -270,17 +305,28 @@ func Alerts(c *gin.Context) {
 	})
 }
 
+// SearchBigBookJSON updated for alphabetical default list
 func SearchBigBookJSON(c *gin.Context) {
 	query := c.Query("q")
 	var results []map[string]interface{}
 	
 	// 1. Articles
 	var articles []models.KnowledgeArticle
+	db := database.DB.Model(&models.KnowledgeArticle{})
+
 	if query != "" {
-		database.DB.Where("title ILIKE ? OR content ILIKE ?", "%"+query+"%", "%"+query+"%").Limit(5).Find(&articles)
+		db = db.Where("title ILIKE ? OR content ILIKE ?", "%"+query+"%", "%"+query+"%")
+	} else {
+		// Default sort alphabetical
+		db = db.Order("title ASC")
 	}
+	
+	// Limit to 20 to avoid heavy load on dropdown
+	db.Limit(20).Find(&articles)
+
 	for _, a := range articles {
 		results = append(results, map[string]interface{}{
+			"ID": a.ID,
 			"Title": a.Title,
 			"Category": a.Category,
 			"Content": a.Content,
@@ -288,23 +334,26 @@ func SearchBigBookJSON(c *gin.Context) {
 		})
 	}
 
-	// 2. Candidate Tickets (Resolved)
-	var tickets []models.Ticket
+	// 2. Candidate Tickets (Hanya jika ada query search, supaya list A-Z artikel tidak tercampur bising)
 	if query != "" {
+		var tickets []models.Ticket
 		database.DB.Where("status = ? AND solution != '' AND (subject ILIKE ? OR solution ILIKE ?)", models.StatusResolved, "%"+query+"%", "%"+query+"%").
 			Limit(5).Find(&tickets)
-	}
-	for _, t := range tickets {
-		results = append(results, map[string]interface{}{
-			"Title": t.Subject,
-			"Category": "Ticket Solution",
-			"Content": t.Solution,
-			"Type": "Ticket",
-		})
+		
+		for _, t := range tickets {
+			results = append(results, map[string]interface{}{
+				"ID": t.ID,
+				"Title": t.Subject,
+				"Category": "Ticket Solution",
+				"Content": t.Solution,
+				"Type": "Ticket",
+			})
+		}
 	}
 	
 	c.JSON(200, results)
 }
+
 
 func UpdateProfile(c *gin.Context) {
 	userIDStr, _ := c.Cookie("user_id")

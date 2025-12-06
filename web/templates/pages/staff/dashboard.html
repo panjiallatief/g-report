@@ -118,55 +118,114 @@
                 class="absolute top-0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
             {{ end }}
         </a>
+        <a href="/staff/history" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
+            <i class="fas fa-history text-lg"></i> History
+        </a>
         <a href="/staff/profile" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
             <i class="fas fa-user text-lg"></i> Profile
         </a>
     </nav>
 </div>
 
-<!-- BIG BOOK SEARCH MODAL (Shared with Consumer style) -->
+
+<!-- BIG BOOK SEARCH MODAL (Updated) -->
 <div id="bigbook-modal"
     class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
-    x-data="{ query: '', articles: [] }">
-    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
-        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10">
-            <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> Big Book Search</h2>
+    x-data="{ 
+        query: '', 
+        articles: [], 
+        selectedArticle: null,
+        async fetchArticles() {
+            let url = '/staff/bigbook/search';
+            if (this.query) {
+                url += '?q=' + this.query;
+            }
+            const res = await fetch(url);
+            this.articles = await res.json();
+        }
+    }" x-init="fetchArticles()">
+
+    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl relative">
+        <!-- Modal Header -->
+        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <!-- Back Button (Only visible when viewing Detail) -->
+                <button x-show="selectedArticle" @click="selectedArticle = null"
+                    class="hover:bg-white/10 p-2 rounded-full transition" x-transition>
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> Big Book</h2>
+            </div>
             <button onclick="document.getElementById('bigbook-modal').classList.add('hidden')"
-                class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition"><i
-                    class="fas fa-times text-lg"></i></button>
+                class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition">
+                <i class="fas fa-times text-lg"></i>
+            </button>
         </div>
 
-        <div class="p-4 border-b border-slate-200 bg-slate-50">
-            <div class="relative">
-                <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
-                <input type="text" x-model="query"
-                    @input.debounce.500ms="fetch('/staff/bigbook/search?q='+query).then(r=>r.json()).then(data=>articles=data)"
-                    placeholder="Search knowledge base..."
-                    class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
-            </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-            <template x-for="article in articles" :key="article.ID || article.Title">
-                <div
-                    class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-blue-700 text-lg group-hover:underline" x-text="article.Title"></h3>
-                        <span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase"
-                            x-text="article.Category || 'General'"></span>
-                    </div>
-                    <!-- Handle both standard Articles and Ticket Candidates -->
-                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed"
-                        x-text="(article.Content || article.Solution || '').substring(0, 100) + '...'"></p>
+        <!-- LIST VIEW -->
+        <div x-show="!selectedArticle" class="flex flex-col h-full overflow-hidden">
+            <div class="p-4 border-b border-slate-200 bg-slate-50 shrink-0">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                    <input type="text" id="bb-search-input" x-model="query" @input.debounce.500ms="fetchArticles()"
+                        placeholder="Search knowledge base..."
+                        class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
                 </div>
-            </template>
-            <div x-show="articles.length === 0 && query !== ''" class="text-center text-slate-400 mt-10">
-                <p>No results found.</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+                <div x-show="articles.length > 0 && query === ''" class="mb-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Articles (A-Z)</p>
+                </div>
+
+                <template x-for="article in articles" :key="article.ID || article.Title">
+                    <div @click="selectedArticle = article"
+                        class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-blue-700 text-lg group-hover:underline" x-text="article.Title">
+                            </h3>
+                            <span
+                                class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase"
+                                x-text="article.Category || 'General'"></span>
+                        </div>
+                        <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed"
+                            x-text="(article.Content || article.Solution || '').substring(0, 100) + '...'"></p>
+                    </div>
+                </template>
+                <div x-show="articles.length === 0 && query !== ''" class="text-center text-slate-400 mt-10">
+                    <p>No results found.</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50 text-center shrink-0">
+                <a href="/staff/bigbook" class="text-blue-600 font-bold text-sm hover:underline">View Full Big Book
+                    Page</a>
             </div>
         </div>
 
-        <div class="p-4 border-t border-slate-200 bg-slate-50 text-center">
-            <a href="/staff/bigbook" class="text-blue-600 font-bold text-sm hover:underline">View Full Big Book Page</a>
+        <!-- DETAIL VIEW (Inside Modal) -->
+        <div x-show="selectedArticle" class="flex flex-col h-full overflow-hidden bg-white"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-x-10"
+            x-transition:enter-end="opacity-100 translate-x-0">
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase"
+                        x-text="selectedArticle?.Category || 'General'"></span>
+                    <span class="text-xs text-slate-400 font-bold"
+                        x-text="selectedArticle?.Type === 'Ticket' ? 'TICKET SOLUTION' : 'ARTICLE'"></span>
+                </div>
+
+                <h1 class="text-2xl font-bold text-slate-800 mb-6 leading-tight" x-text="selectedArticle?.Title"></h1>
+
+                <div class="prose prose-slate prose-sm max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed"
+                    x-text="selectedArticle?.Content || selectedArticle?.Solution"></div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50 text-center shrink-0">
+                <button @click="selectedArticle = null"
+                    class="text-slate-500 font-bold text-sm hover:text-slate-800">Close Detail</button>
+            </div>
         </div>
     </div>
-    {{ end }}
+</div>
+{{ end }}

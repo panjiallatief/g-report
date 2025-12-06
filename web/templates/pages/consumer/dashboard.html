@@ -1,5 +1,27 @@
 {{ define "content" }}
-<div class="max-w-[480px] mx-auto min-h-screen bg-f8fafc border-x border-slate-200 relative pb-24">
+<div class="max-w-[480px] mx-auto min-h-screen bg-f8fafc border-x border-slate-200 relative pb-24" x-data="{ 
+        ticketFilter: '',
+        activeTicket: null,
+        ticketActivities: [],
+        isLoadingTicket: false,
+        
+        async openTicket(id) {
+            this.isLoadingTicket = true;
+            this.activeTicket = null; // Reset
+            document.getElementById('ticket-detail-modal').classList.remove('hidden');
+            
+            try {
+                const res = await fetch('/consumer/tickets/' + id + '/details');
+                const data = await res.json();
+                this.activeTicket = data.ticket;
+                this.ticketActivities = data.activities;
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.isLoadingTicket = false;
+            }
+        }
+    }">
     <!-- Header -->
     <header
         class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-8 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
@@ -19,10 +41,11 @@
                 </a>
             </div>
 
-            <!-- Search Bar -->
+            <!-- Main Search Bar (Deflection / Big Book) -->
             <div class="relative group">
-                <input type="text" placeholder="Cari solusi (mis: Mic mati?)"
-                    class="w-full pl-11 pr-4 py-3.5 rounded-xl text-slate-800 text-sm shadow-lg focus:outline-none focus:ring-4 focus:ring-indigo-300 transition placeholder:text-slate-400">
+                <input type="text" placeholder="Cari solusi (mis: Mic mati?)" readonly
+                    onclick="document.getElementById('bigbook-modal').classList.remove('hidden'); document.getElementById('bb-search-input').focus()"
+                    class="w-full pl-11 pr-4 py-3.5 rounded-xl text-slate-800 text-sm shadow-lg focus:outline-none focus:ring-4 focus:ring-indigo-300 transition placeholder:text-slate-400 cursor-pointer bg-white">
                 <i
                     class="fas fa-search absolute left-4 top-4 text-slate-400 group-focus-within:text-indigo-500 transition"></i>
             </div>
@@ -32,7 +55,7 @@
     </header>
 
     <!-- Main Action Buttons -->
-    <div class="p-6 grid grid-cols-2 gap-4 -mt-2 slide-up">
+    <div class="p-6 grid grid-cols-1 gap-4 -mt-2 slide-up">
         <button onclick="document.getElementById('create-ticket-modal').classList.remove('hidden')"
             class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover-scale hover:bg-red-50 hover:border-red-200 transition group active:scale-95 transform">
             <div
@@ -41,14 +64,14 @@
             </div>
             <span class="text-sm font-bold text-slate-700">Lapor Masalah</span>
         </button>
-        <button onclick="document.getElementById('bigbook-modal').classList.remove('hidden')"
+        <!-- <button onclick="document.getElementById('bigbook-modal').classList.remove('hidden')"
             class="bg-white p-5 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center gap-3 hover-scale hover:bg-indigo-50 hover:border-indigo-200 transition group active:scale-95 transform">
             <div
                 class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xl group-hover:scale-110 transition shadow-sm">
                 <i class="fas fa-book-reader"></i>
             </div>
             <span class="text-sm font-bold text-slate-700">Buka Big Book</span>
-        </button>
+        </button> -->
     </div>
 
     <!-- Ticket History (Placeholder) -->
@@ -57,117 +80,253 @@
             <h3 class="font-bold text-slate-800 text-lg">Tiket Terakhir</h3>
         </div>
 
-        {{ range .tickets }}
-        <div
-            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-3 hover:border-blue-300 transition group flex flex-col gap-3">
+        <!-- NEW: Ticket Filter Input -->
+        <div class="mb-4 relative">
+            <i class="fas fa-filter absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" x-model="ticketFilter" placeholder="Filter tiket saya..."
+                class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
 
-            <!-- Baris Atas: Icon & Judul -->
-            <div class="flex justify-between items-start">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full flex-shrink-0 {{ if eq .Status " RESOLVED" }}bg-green-100
-                        text-green-600{{ else }}bg-blue-100 text-blue-600{{ end }} flex items-center justify-center
-                        font-bold text-sm">
-                        {{ if eq .Status "RESOLVED" }}<i class="fas fa-check"></i>{{ else }}<i
-                            class="fas fa-ticket-alt"></i>{{ end }}
+        <!-- Ticket List (Filtered by Alpine) -->
+        <div class="space-y-3">
+            {{ range .tickets }}
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-blue-300 transition group cursor-pointer active:scale-[0.98]"
+                x-show="ticketFilter === '' || '{{ .Subject }}'.toLowerCase().includes(ticketFilter.toLowerCase()) || '{{ .TicketNumber }}'.includes(ticketFilter)"
+                @click="openTicket('{{ .ID }}')">
+
+                <!-- Baris Atas: Icon & Judul -->
+                <div class="flex justify-between items-start">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex-shrink-0 {{ if eq .Status " RESOLVED" }}bg-green-100
+                            text-green-600{{ else }}bg-blue-100 text-blue-600{{ end }} flex items-center justify-center
+                            font-bold text-sm">
+                            {{ if eq .Status "RESOLVED" }}<i class="fas fa-check"></i>{{ else }}<i
+                                class="fas fa-ticket-alt"></i>{{ end }}
+                        </div>
+                        <div>
+                            <h4
+                                class="font-bold text-slate-700 text-sm group-hover:text-blue-600 transition line-clamp-1">
+                                {{ .Subject }}</h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">
+                                #{{ .TicketNumber }} &bull;
+                                <span class="{{ if eq .Status " RESOLVED" }}text-green-600{{ else }}text-blue-600{{ end
+                                    }} font-bold">{{ .Status }}</span>
+                                &bull; {{ .CreatedAt.Format "02 Jan 15:04" }}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-slate-700 text-sm group-hover:text-blue-600 transition line-clamp-1">
-                            {{ .Subject }}</h4>
-                        <p class="text-[10px] text-slate-400 mt-0.5">
-                            #{{ .TicketNumber }} &bull;
-                            <span class="{{ if eq .Status " RESOLVED" }}text-green-600{{ else }}text-blue-600{{ end }}
-                                font-bold">{{ .Status }}</span>
-                            &bull; {{ .CreatedAt.Format "02 Jan 15:04" }}
-                        </p>
-                    </div>
+                    {{ if eq .Priority "URGENT_ON_AIR" }}
+                    <span
+                        class="text-[9px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase animate-pulse">ON
+                        AIR</span>
+                    {{ end }}
                 </div>
-                <!-- Status Priority Badge (Optional) -->
-                {{ if eq .Priority "URGENT_ON_AIR" }}
-                <span
-                    class="text-[9px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase animate-pulse">ON
-                    AIR</span>
+                <!-- Thumbnail Bukti di List -->
+                {{ if .ProofImageURL }}
+                <div class="ml-12 pl-1 border-l-2 border-slate-100 mt-2">
+                    <p class="text-[10px] text-slate-400 mb-1.5 font-medium flex items-center gap-1"><i
+                            class="fas fa-paperclip"></i> Ada Lampiran</p>
+                </div>
                 {{ end }}
             </div>
-
-            <!-- BAGIAN BARU: Thumbnail Bukti Foto -->
-            {{ if .ProofImageURL }}
-            <div class="ml-12 pl-1 border-l-2 border-slate-100">
-                <p class="text-[10px] text-slate-400 mb-1.5 font-medium">Lampiran Bukti:</p>
-                <a href="{{ .ProofImageURL }}" target="_blank"
-                    class="inline-flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition group/img w-full max-w-[200px]">
-                    <!-- Thumbnail Image -->
-                    <img src="{{ .ProofImageURL }}"
-                        class="w-10 h-10 rounded object-cover border border-slate-200 bg-white">
-
-                    <div class="flex-1 min-w-0">
-                        <p class="text-[10px] font-bold text-slate-600 group-hover/img:text-blue-600 truncate">Lihat
-                            Foto</p>
-                        <p class="text-[9px] text-slate-400">Klik untuk memperbesar</p>
-                    </div>
-                    <i class="fas fa-external-link-alt text-slate-300 text-xs mr-2 group-hover/img:text-blue-400"></i>
-                </a>
+            {{ else }}
+            <div class="bg-white p-6 rounded-xl text-center text-slate-400 border border-slate-200 border-dashed">
+                <p class="text-sm">Belum ada tiket.</p>
             </div>
             {{ end }}
         </div>
-        {{ else }}
-        <div class="bg-white p-6 rounded-xl text-center text-slate-400 border border-slate-200 border-dashed">
-            <p class="text-sm">Belum ada tiket.</p>
+    </div>
+
+    <!-- TICKET DETAIL & CHAT MODAL -->
+    <div id="ticket-detail-modal" class="hidden fixed inset-0 z-[70] bg-white flex flex-col fade-in">
+        <!-- Header -->
+        <div class="bg-white border-b border-slate-200 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
+            <button onclick="document.getElementById('ticket-detail-modal').classList.add('hidden')"
+                class="text-slate-500 hover:text-slate-800 transition">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </button>
+            <div class="flex-1" x-show="!isLoadingTicket">
+                <h3 class="font-bold text-slate-800 text-lg">#<span x-text="activeTicket?.TicketNumber"></span></h3>
+                <p class="text-xs text-slate-500 font-bold flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full"
+                        :class="activeTicket?.Status === 'RESOLVED' ? 'bg-green-500' : 'bg-blue-500'"></span>
+                    <span x-text="activeTicket?.Status"></span> &bull;
+                    <span x-text="activeTicket?.Subject" class="truncate max-w-[150px]"></span>
+                </p>
+            </div>
+            <div x-show="isLoadingTicket" class="flex-1">
+                <div class="h-4 w-24 bg-slate-200 rounded animate-pulse mb-1"></div>
+                <div class="h-3 w-32 bg-slate-200 rounded animate-pulse"></div>
+            </div>
         </div>
-        {{ end }}
+
+        <!-- Chat & Detail Area -->
+        <div class="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6">
+
+            <div x-show="isLoadingTicket" class="flex justify-center py-10">
+                <i class="fas fa-circle-notch fa-spin text-blue-500 text-2xl"></i>
+            </div>
+
+            <!-- TICKET INFO & PROOF IMAGE BLOCK -->
+            <div x-show="!isLoadingTicket && activeTicket"
+                class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 slide-up">
+                <h4 class="font-bold text-sm text-slate-800 mb-2">Detail Tiket</h4>
+                <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div class="text-slate-500">Lokasi:</div>
+                    <div class="font-bold text-slate-700" x-text="activeTicket?.Location"></div>
+                    <div class="text-slate-500">Kategori:</div>
+                    <div class="font-bold text-slate-700" x-text="activeTicket?.Category"></div>
+                    <div class="text-slate-500">Urgensi:</div>
+                    <div class="font-bold"
+                        :class="activeTicket?.Priority === 'URGENT_ON_AIR' ? 'text-red-600' : 'text-slate-700'"
+                        x-text="activeTicket?.Priority"></div>
+                </div>
+
+                <!-- BUKTI FOTO (Ditampilkan jika ada) -->
+                <div x-show="activeTicket?.ProofImageURL" class="mt-4 pt-3 border-t border-slate-100">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Bukti Foto:</span>
+                    <a :href="activeTicket?.ProofImageURL" target="_blank"
+                        class="block group relative overflow-hidden rounded-lg border border-slate-200 w-full max-w-xs bg-slate-100">
+                        <img :src="activeTicket?.ProofImageURL" alt="Bukti Masalah" loading="lazy"
+                            class="w-full h-40 object-cover group-hover:scale-105 transition duration-300">
+                        <div
+                            class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
+                            <i
+                                class="fas fa-external-link-alt text-white opacity-0 group-hover:opacity-100 drop-shadow-md text-xl"></i>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Chat Bubbles Loop -->
+            <template x-for="activity in ticketActivities" :key="activity.Time + activity.Note">
+                <div :class="activity.IsMe ? 'flex flex-row-reverse gap-3' : 'flex gap-3 slide-up'">
+                    <img :src="activity.ActorAvatar || 'https://ui-avatars.com/api/?name='+activity.ActorName+'&background=random'"
+                        class="w-8 h-8 rounded-full shadow-sm flex-shrink-0 object-cover">
+
+                    <div class="flex flex-col gap-1 max-w-[85%]" :class="activity.IsMe ? 'items-end' : ''">
+                        <span class="text-[10px] text-slate-400 font-bold" :class="activity.IsMe ? 'mr-1' : 'ml-1'"
+                            x-text="activity.ActorName"></span>
+
+                        <div class="shadow-sm text-sm border leading-relaxed p-3" :class="[
+                                activity.IsMe ? 'bg-blue-600 text-white rounded-l-xl rounded-br-xl border-blue-600 text-right' : 
+                                (activity.ActionType === 'RESOLVE' ? 'bg-green-50 text-slate-700 border-green-100 rounded-r-xl rounded-bl-xl' : 
+                                'bg-white text-slate-700 border-slate-200 rounded-r-xl rounded-bl-xl')
+                             ]">
+                            <div x-show="activity.ActionType === 'RESOLVE'"
+                                class="font-bold text-green-600 text-xs mb-1">
+                                <i class="fas fa-check-circle"></i> Resolved
+                            </div>
+                            <span x-text="activity.Note"></span>
+                        </div>
+                        <span class="text-[10px] text-slate-400" :class="activity.IsMe ? 'mr-1' : 'ml-1'"
+                            x-text="activity.Time"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Chat Input Footer -->
+        <div class="p-3 border-t border-slate-200 bg-white sticky bottom-0 z-20"
+            x-show="activeTicket?.Status !== 'CLOSED'">
+            <form :action="'/consumer/tickets/' + activeTicket?.ID + '/reply'" method="POST" class="relative">
+                <input type="text" name="message" required placeholder="Tulis balasan..." autocomplete="off"
+                    class="w-full pl-4 pr-12 py-3 rounded-full border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm">
+                <button type="submit"
+                    class="absolute right-2 top-1.5 bg-blue-600 text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow-sm">
+                    <i class="fas fa-paper-plane text-xs"></i>
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- 1. BIG BOOK SEARCH MODAL -->
+<!-- BIG BOOK SEARCH MODAL (Shared) -->
 <div id="bigbook-modal"
     class="hidden fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
-    x-data="{ query: '', articles: [] }">
-    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
-        <!-- Modal Header -->
-        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10">
-            <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> The Big Book</h2>
+    x-data="{ 
+        query: '', 
+        articles: [], 
+        selectedArticle: null,
+        async fetchArticles() {
+            let url = '/consumer/bigbook';
+            if (this.query) {
+                url += '?q=' + this.query;
+            }
+            const res = await fetch(url);
+            this.articles = await res.json();
+        }
+    }" x-init="fetchArticles()">
+
+    <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl relative">
+        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <button x-show="selectedArticle" @click="selectedArticle = null"
+                    class="hover:bg-white/10 p-2 rounded-full transition" x-transition>
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 class="font-bold text-lg"><i class="fas fa-book mr-2 text-blue-400"></i> Big Book</h2>
+            </div>
             <button onclick="document.getElementById('bigbook-modal').classList.add('hidden')"
-                class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition"><i
-                    class="fas fa-times text-lg"></i></button>
-        </div>
-
-        <!-- Search -->
-        <div class="p-4 border-b border-slate-200 bg-slate-50">
-            <div class="relative">
-                <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
-                <input type="text" x-model="query"
-                    @input.debounce.500ms="fetch('/consumer/bigbook?q='+query).then(r=>r.json()).then(data=>articles=data)"
-                    placeholder="Ketik masalah (contoh: error 505, wifi lemot)..."
-                    class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
-            </div>
-        </div>
-
-        <!-- Content -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-            <template x-for="article in articles" :key="article.ID">
-                <div @click="window.location.href='/consumer/articles/' + article.ID"
-                    class="border border-slate-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="font-bold text-blue-700 text-lg group-hover:underline" x-text="article.Title"></h3>
-                        <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase"
-                            x-text="article.Category"></span>
-                    </div>
-                    <p class="text-sm text-slate-600 line-clamp-2 leading-relaxed"
-                        x-text="article.Content.substring(0, 100) + '...'"></p>
-                </div>
-            </template>
-            <div x-show="articles.length === 0 && query !== ''" class="text-center text-slate-400 mt-10">
-                <p>Tidak ada hasil ditemukan.</p>
-            </div>
-        </div>
-
-        <!-- Footer (CTA) -->
-        <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end items-center gap-3">
-            <span class="text-xs text-slate-500">Tidak menemukan solusi?</span>
-            <button
-                onclick="document.getElementById('bigbook-modal').classList.add('hidden'); document.getElementById('create-ticket-modal').classList.remove('hidden')"
-                class="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition">
-                Lapor ke IT
+                class="hover:text-red-400 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition">
+                <i class="fas fa-times text-lg"></i>
             </button>
+        </div>
+
+        <div x-show="!selectedArticle" class="flex flex-col h-full overflow-hidden">
+            <div class="p-4 border-b border-slate-200 bg-slate-50 shrink-0">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                    <input type="text" id="bb-search-input" x-model="query" @input.debounce.300ms="fetchArticles()"
+                        placeholder="Cari solusi atau pilih dari daftar..."
+                        class="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+                <div x-show="articles.length > 0 && query === ''" class="mb-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Artikel Tersedia (A-Z)</p>
+                </div>
+                <template x-for="article in articles" :key="article.ID">
+                    <div @click="selectedArticle = article"
+                        class="border border-slate-200 rounded-xl p-4 hover:border-blue-400 hover:shadow-md transition cursor-pointer group bg-white flex justify-between items-center">
+                        <div class="flex-1 pr-4">
+                            <h3 class="font-bold text-slate-700 text-base group-hover:text-blue-700 transition"
+                                x-text="article.Title"></h3>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span
+                                    class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase"
+                                    x-text="article.Category"></span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-300 group-hover:text-blue-500 transition"></i>
+                    </div>
+                </template>
+                <div x-show="articles.length === 0" class="text-center text-slate-400 mt-10">
+                    <p>Tidak ada artikel ditemukan.</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
+                <span class="text-xs text-slate-500">Masalah belum selesai?</span>
+                <button
+                    onclick="document.getElementById('bigbook-modal').classList.add('hidden'); document.getElementById('create-ticket-modal').classList.remove('hidden')"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition">
+                    Lapor ke IT
+                </button>
+            </div>
+        </div>
+
+        <div x-show="selectedArticle" class="flex flex-col h-full overflow-hidden bg-white" x-transition>
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase"
+                        x-text="selectedArticle?.Category"></span>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800 mb-6 leading-tight" x-text="selectedArticle?.Title"></h1>
+                <div class="prose prose-slate prose-sm max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed"
+                    x-text="selectedArticle?.Content"></div>
+            </div>
         </div>
     </div>
 </div>
