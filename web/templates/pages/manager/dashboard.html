@@ -326,35 +326,41 @@
                 </div>
             </div>
 
-            <!-- Approval Queue -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+           <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
                 <div class="p-4 border-b border-slate-100 bg-orange-50 flex items-center gap-2">
                     <i class="fas fa-clock text-orange-500"></i>
                     <h3 class="font-bold text-orange-800 text-sm">Pending Verification ({{ .newArticlesCount }})</h3>
                 </div>
-                <div class="divide-y divide-slate-100">
-                    {{ range .pendingArticles }}
-                    <div class="p-5 flex justify-between items-start">
-                        <div>
-                            <h4 class="font-bold text-lg text-slate-800">{{ .Title }}</h4>
-                            <p class="text-sm text-slate-500 mt-1">Author: <span class="font-bold text-slate-700">{{
-                                    .Author.FullName }}</span> &bull; {{ .CreatedAt.Format "02 Jan 2006" }}</p>
-                            <p
-                                class="text-sm text-slate-600 mt-2 bg-slate-50 p-2 rounded border border-slate-100 italic">
-                                {{ .Category }}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <form action="/manager/articles/{{ .ID }}/verify" method="POST">
-                                <button type="submit"
-                                    class="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-700">Approve</button>
-                            </form>
-                            <button
-                                class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50">Edit</button>
-                        </div>
-                    </div>
-                    {{ else }}
-                    <div class="p-6 text-center text-slate-400">Tidak ada artikel pending.</div>
-                    {{ end }}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-3">Title</th>
+                                <th class="px-6 py-3">Author</th>
+                                <th class="px-6 py-3">Category</th>
+                                <th class="px-6 py-3">Date</th>
+                                <th class="px-6 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {{ range .pendingArticles }}
+                            <tr class="hover:bg-slate-50 transition cursor-pointer"
+                                @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}')">
+                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Title }}</td>
+                                <td class="px-6 py-4">{{ .Author.FullName }}</td>
+                                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{{ .Category }}</span></td>
+                                <td class="px-6 py-4 text-slate-500">{{ .CreatedAt.Format "02 Jan 15:04" }}</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button class="text-blue-600 font-bold hover:underline">Review</button>
+                                </td>
+                            </tr>
+                            {{ else }}
+                            <tr>
+                                <td colspan="5" class="p-6 text-center text-slate-400">Tidak ada artikel pending.</td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -551,6 +557,63 @@
                 </form>
             </div>
         </div>
+
+        <!-- REVIEW ARTICLE MODAL -->
+    <div x-show="reviewModalOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4 fade-in" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="reviewModalOpen = false"></div>
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10">
+            
+            <!-- Header -->
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg">Review Article</h3>
+                    <p class="text-xs text-slate-500">Approve to publish, Edit to refine, or Deny to delete.</p>
+                </div>
+                <button @click="reviewModalOpen = false" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-8 bg-white">
+                <div class="mb-6">
+                    <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase" x-text="reviewArticle.category"></span>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-2 mb-1" x-text="reviewArticle.title"></h2>
+                    <p class="text-sm text-slate-500">Draft by <span class="font-bold text-slate-700" x-text="reviewArticle.author"></span></p>
+                </div>
+                
+                <div class="prose prose-sm prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap" x-text="reviewArticle.content">
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
+                
+                <!-- Action Group Kiri: Deny -->
+                <form :action="'/manager/articles/' + reviewArticle.id + '/deny'" method="POST" onsubmit="return confirm('Tolak dan hapus artikel ini?')">
+                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition">
+                        <i class="fas fa-times mr-2"></i> Deny
+                    </button>
+                </form>
+
+                <!-- Action Group Kanan: Edit & Approve -->
+                <div class="flex gap-2">
+                    <!-- Tombol Edit (Placeholder logic for edit) -->
+                    <!-- In a real scenario, you'd open another modal or turn this into edit mode. For now, simple edit not fully implemented in this block but structure is here -->
+                    <button type="button" 
+                            class="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 border border-slate-300 hover:bg-slate-50 transition"
+                            onclick="alert('Edit functionality coming in next update!')">
+                        <i class="fas fa-edit mr-2"></i> Edit
+                    </button>
+
+                    <!-- Form Approve -->
+                    <form :action="'/manager/articles/' + reviewArticle.id + '/verify'" method="POST">
+                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition">
+                            <i class="fas fa-check mr-2"></i> Approve
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
         <!-- NEW ROUTINE MODAL -->
         <div id="new-routine-modal"

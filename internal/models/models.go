@@ -14,7 +14,7 @@ type UserRole string
 const (
 	RoleConsumer UserRole = "CONSUMER"
 	RoleStaff    UserRole = "STAFF"
-	RoleManager  UserRole = "MANAGER" // updated from ADMIN
+	RoleManager  UserRole = "MANAGER"
 )
 
 type TicketStatus string
@@ -134,10 +134,10 @@ type Ticket struct {
 	TicketNumber      int       `gorm:"autoIncrement;unique"`
 	Location          LocationEnum `gorm:"type:location_enum"`
 	Priority          TicketPriority `gorm:"type:ticket_priority;default:'NORMAL'"`
-	Category          string       // Simplified
+	Category          string       
 	Subject           string    `gorm:"not null"`
 	Description       string
-	Solution          string // Solusi penyelesaian (Big Book candidate)
+	Solution          string 
 	ProofImageURL     string
 	RequesterID       uuid.UUID
 	Status            TicketStatus `gorm:"type:ticket_status;default:'OPEN'"`
@@ -147,6 +147,9 @@ type Ticket struct {
 	ResolvedAt        *time.Time
 	ClosedAt          *time.Time
 	IsHandover        bool `gorm:"default:false"`
+	
+	// NEW FIELD: Mencegah tiket yang sama muncul terus di saran artikel
+	IsConvertedToArticle bool `gorm:"default:false"` 
 
 	Requester         User `gorm:"foreignKey:RequesterID"`
 }

@@ -178,16 +178,28 @@ func Dashboard(c *gin.Context) {
 	}
 	slaMetrics = append(slaMetrics, normalStats)
 
-	// Big Book Stats
-	var articleCount int64
-	var newArticlesCount int64
+	// 5. BIG BOOK DATA
+	var articleCount, newArticlesCount int64
 	database.DB.Model(&models.KnowledgeArticle{}).Count(&articleCount)
 	database.DB.Model(&models.KnowledgeArticle{}).Where("is_verified = ?", false).Count(&newArticlesCount)
-	// Removed premature 'pendingArticles' Find call here to fix undefined error
 
-	// 2. Pending Articles for Verification
+	// List Pending (Approval Queue)
 	var pendingArticles []models.KnowledgeArticle
 	database.DB.Preload("Author").Where("is_verified = ?", false).Find(&pendingArticles)
+
+	// List Published
+	var publishedArticles []models.KnowledgeArticle
+	database.DB.Where("is_verified = ?", true).Order("views_count desc").Find(&publishedArticles)
+
+	// --- [LOGIKA PENTING] CANDIDATE TICKETS ---
+	// Ambil tiket yang: 1. Resolved, 2. Punya solusi, 3. BELUM diconvert jadi artikel
+	var candidateTickets []models.Ticket
+	database.DB.Preload("Requester").
+		Where("status = ? AND solution != '' AND is_converted_to_article = ?", models.StatusResolved, false).
+		Order("resolved_at desc").
+		Limit(10).
+		Find(&candidateTickets)
+	
 
 	// 3. Upcoming Schedule (Next 7 Days)
 	type ShiftView struct {
@@ -241,12 +253,6 @@ func Dashboard(c *gin.Context) {
 		First(&activeShift)
 
 	hasActiveShift := activeShift.ID != uuid.Nil
-
-
-
-	// 5. PUBLISHED ARTICLES (Top 5 by views)
-	var publishedArticles []models.KnowledgeArticle
-	database.DB.Where("is_verified = ?", true).Order("views_count desc").Limit(5).Find(&publishedArticles)
 
 	// 6. STAFF PERFORMANCE (Aggregation)
 	type StaffStat struct {
@@ -304,17 +310,22 @@ func Dashboard(c *gin.Context) {
 		"fcr":               int(fcrRate),
 		"period":            period, // Kirim balik ke UI untuk set selected option
 		"chartData":         chartData, // Data Chart
-		"articleCount":      articleCount,
-		"newArticlesCount":  newArticlesCount,
-		"pendingArticles":   pendingArticles,
+		// Big Book Data
+		"articleCount": articleCount, 
+		"newArticlesCount": newArticlesCount,
+		"pendingArticles": pendingArticles,
+		"publishedArticles": publishedArticles,
+		"candidateTickets": candidateTickets, // Data tiket yang belum diconvert
 		"upcomingShifts":    upcomingShifts,
 		"activeShift":       activeShift,
 		"hasActiveShift":    hasActiveShift,
-		"publishedArticles": publishedArticles,
 		"staffPerformance":  staffPerformance,
 		"allStaff":          allStaff,
 		"slaMetrics":        slaMetrics,
 		"routineTemplates":  routineTemplates,
+
+		
+		
 	})
 }
 
@@ -383,11 +394,113 @@ func ImportSchedule(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/manager")
 }
 
+
+// 1. Get Data JSON untuk Modal Edit
+func GetArticleJSON(c *gin.Context) {
+	id := c.Param("id")
+	var article models.KnowledgeArticle
+	if err := database.DB.Preload("Author").First(&article, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
+		return
+	}
+	// Return field JSON yang sesuai dengan AlpineJS di frontend
+	c.JSON(http.StatusOK, gin.H{
+		"id":       article.ID,
+		"title":    article.Title,
+		"category": article.Category,
+		"content":  article.Content,
+		"author":   article.Author.FullName,
+		"date":     article.CreatedAt.Format("02 Jan 2006"),
+	})
+}
+
+// 2. Convert Ticket -> Article
+func ConvertTicketToArticle(c *gin.Context) {
+	ticketID := c.Param("id")
+	var ticket models.Ticket
+	if err := database.DB.First(&ticket, "id = ?", ticketID).Error; err != nil {
+		c.Redirect(http.StatusFound, "/manager?error=TicketNotFound")
+		return
+	}
+
+	userIDStr, _ := c.Cookie("user_id")
+	managerID, _ := uuid.Parse(userIDStr)
+
+	// Buat Artikel Baru
+	article := models.KnowledgeArticle{
+		Title:      ticket.Subject,
+		Category:   ticket.Category,
+		Content:    ticket.Solution, // Solusi tiket otomatis jadi konten artikel
+		AuthorID:   managerID,       // Di-publish oleh Manager
+		IsVerified: true,            // Langsung verified karena masuk jalur cepat
+		CreatedAt:  time.Now(),
+	}
+
+	if err := database.DB.Create(&article).Error; err != nil {
+		// handle error
+	} else {
+		// PENTING: Tandai tiket sudah dikonversi agar hilang dari list kandidat
+		database.DB.Model(&ticket).Update("is_converted_to_article", true)
+	}
+
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+// 3. Create Manual Article
+func CreateArticle(c *gin.Context) {
+	title := c.PostForm("title")
+	category := c.PostForm("category")
+	content := c.PostForm("content")
+	userIDStr, _ := c.Cookie("user_id")
+	userID, _ := uuid.Parse(userIDStr)
+
+	article := models.KnowledgeArticle{
+		Title:      title,
+		Category:   category,
+		Content:    content,
+		AuthorID:   userID,
+		IsVerified: true, // Artikel buatan manager langsung publish
+		CreatedAt:  time.Now(),
+	}
+	database.DB.Create(&article)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+// 4. Update Article
+func UpdateArticle(c *gin.Context) {
+	id := c.Param("id")
+	var article models.KnowledgeArticle
+	if err := database.DB.First(&article, "id = ?", id).Error; err == nil {
+		article.Title = c.PostForm("title")
+		article.Category = c.PostForm("category")
+		article.Content = c.PostForm("content")
+		database.DB.Save(&article)
+	}
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+// 5. Verify (Approve) Article from Staff
 func VerifyArticle(c *gin.Context) {
 	id := c.Param("id")
 	database.DB.Model(&models.KnowledgeArticle{}).Where("id = ?", id).Update("is_verified", true)
 	c.Redirect(http.StatusFound, "/manager")
 }
+
+// 6. Deny Article (Hapus Draft)
+func DenyArticle(c *gin.Context) {
+	id := c.Param("id")
+	// Hard delete: Hapus permanen dari DB agar tidak menumpuk sampah
+	database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+// 7. Delete Published Article
+func DeleteArticle(c *gin.Context) {
+	id := c.Param("id")
+	database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id)
+	c.Redirect(http.StatusFound, "/manager")
+}
+
 
 func CreateRoutine(c *gin.Context) {
 	title := c.PostForm("title")
