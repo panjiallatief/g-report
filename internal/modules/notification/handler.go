@@ -5,19 +5,22 @@ import (
 	"it-broadcast-ops/internal/database"
 	"it-broadcast-ops/internal/models"
 	"net/http"
-	// "it-broadcast-ops/internal/notification"
+
+	// Import package service notification dengan alias "notifService"
+	// Ini wajib karena nama package handler kita juga "notification"
+	notifService "it-broadcast-ops/internal/notification"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 func RegisterRoutes(r *gin.Engine) {
-	// Init Keys saat aplikasi start
-	InitKeys()
+	// Panggil fungsi dari package service menggunakan alias
+	notifService.InitKeys()
 
 	// Public endpoint untuk get VAPID Key (agar frontend tahu key mana yg dipakai)
 	r.GET("/notifications/vapid-public-key", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"publicKey": VapidPublicKey})
+		c.JSON(http.StatusOK, gin.H{"publicKey": notifService.VapidPublicKey})
 	})
 
 	// Endpoint Subscribe (Butuh Login)
