@@ -23,6 +23,7 @@ func RegisterRoutes(r *gin.Engine) {
 		staffGroup.POST("/tickets/:id/handover", HandoverTicket)
 		staffGroup.POST("/tickets/:id/resolve", ResolveTicket)
 		staffGroup.POST("/routine/:id/toggle", ToggleRoutineItem)
+		staffGroup.POST("/tickets/:id/reply", ReplyTicket) 
 		staffGroup.GET("/bigbook", BigBook)
 		staffGroup.GET("/bigbook/search", SearchBigBookJSON)
 		staffGroup.GET("/articles/:id", ArticleDetail)
@@ -366,4 +367,42 @@ func ArticleDetail(c *gin.Context) {
 		"title":   article.Title,
 		"article": article,
 	})
+}
+
+
+func ReplyTicket(c *gin.Context) {
+	id := c.Param("id")
+	message := c.PostForm("message")
+	
+	if message == "" {
+		c.Redirect(http.StatusFound, "/staff/tickets/"+id)
+		return
+	}
+
+	userIDStr, _ := c.Cookie("user_id")
+	userID, _ := uuid.Parse(userIDStr)
+
+	// 1. Simpan Activity (Chat)
+	activity := models.TicketActivity{
+		TicketID:   uuid.MustParse(id),
+		ActorID:    userID,
+		ActionType: "REPLY",
+		Note:       message,
+		CreatedAt:  time.Now(),
+	}
+	database.DB.Create(&activity)
+
+	// 2. Auto-update status: Jika masih OPEN -> Ubah jadi IN_PROGRESS
+	// Logika: Jika teknisi membalas, berarti tiket sedang dikerjakan (MTTA stop)
+	var ticket models.Ticket
+	database.DB.First(&ticket, "id = ?", id)
+	
+	if ticket.Status == models.StatusOpen {
+		database.DB.Model(&ticket).Updates(map[string]interface{}{
+			"status":            models.StatusInProgress,
+			"first_response_at": time.Now(),
+		})
+	}
+
+	c.Redirect(http.StatusFound, "/staff/tickets/"+id)
 }

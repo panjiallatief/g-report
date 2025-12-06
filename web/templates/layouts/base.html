@@ -5,6 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .title }} - IT Broadcast Ops</title>
+
+    <!-- PWA Manifest & Meta -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906309.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -82,6 +88,18 @@
 
 <body class="bg-gray-100 text-slate-800">
     {{ template "content" . }}
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/static/sw.js').then(function (registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function (err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
 </body>
 
 </html>

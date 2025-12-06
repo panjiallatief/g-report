@@ -31,6 +31,21 @@
             <p class="mt-4 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
                 "{{ .ticket.Description }}"
             </p>
+            {{ if .ticket.ProofImageURL }}
+            <div class="mt-4">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Bukti Foto:</span>
+                <a href="{{ .ticket.ProofImageURL }}" target="_blank"
+                    class="block group relative overflow-hidden rounded-lg border border-slate-200 w-full max-w-xs">
+                    <img src="{{ .ticket.ProofImageURL }}" alt="Bukti Masalah"
+                        class="w-full h-auto object-cover group-hover:scale-105 transition duration-300">
+                    <div
+                        class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
+                        <i
+                            class="fas fa-external-link-alt text-white opacity-0 group-hover:opacity-100 drop-shadow-md"></i>
+                    </div>
+                </a>
+            </div>
+            {{ end }}
         </div>
 
         <!-- Chat Bubbles Placeholder -->
@@ -86,11 +101,34 @@
                     <span class="text-[10px] text-slate-400 mr-1">{{ .CreatedAt.Format "02 Jan 15:04" }}</span>
                 </div>
             </div>
+            {{ else if eq .ActionType "REPLY" }}
+            <div class="flex flex-row-reverse gap-3 slide-up">
+                <img src="{{ if .Actor.AvatarURL }}{{ .Actor.AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .Actor.FullName }}&background=0284c7&color=fff{{ end }}"
+                    class="w-8 h-8 rounded-full shadow-sm flex-shrink-0 object-cover">
+                <div class="flex flex-col gap-1 items-end max-w-[85%]">
+                    <span class="text-[10px] text-slate-400 font-bold mr-1">{{ .Actor.FullName }}</span>
+                    <div
+                        class="bg-blue-600 p-3 rounded-l-xl rounded-br-xl shadow-sm text-sm text-white leading-relaxed text-right">
+                        {{ .Note }}
+                    </div>
+                    <span class="text-[10px] text-slate-400 mr-1">{{ .CreatedAt.Format "15:04" }}</span>
+                </div>
+            </div>
             {{ end }}
             {{ end }}
         </div>
     </div>
 
+    <div class="sticky bottom-0 bg-slate-50 pt-2 pb-4 px-4 z-30 border-t border-slate-100">
+        <form action="/staff/tickets/{{ .ticket.ID }}/reply" method="POST" class="relative shadow-sm">
+            <input type="text" name="message" required placeholder="Tulis balasan / update..." autocomplete="off"
+                class="w-full pl-4 pr-12 py-3 rounded-full border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white">
+            <button type="submit"
+                class="absolute right-2 top-1.5 bg-blue-600 text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow-sm">
+                <i class="fas fa-paper-plane text-xs"></i>
+            </button>
+        </form>
+    </div>
     <!-- Action Bar -->
     <div class="p-4 border-t border-slate-200 bg-white grid grid-cols-2 gap-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] relative z-20"
         x-data="{ showHandover: false }">

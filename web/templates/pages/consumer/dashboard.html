@@ -59,21 +59,55 @@
 
         {{ range .tickets }}
         <div
-            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center mb-3 hover:border-blue-300 transition group">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 rounded-full {{ if eq .Status " RESOLVED" }}bg-green-100 text-green-600{{ else
-                    }}bg-blue-100 text-blue-600{{ end }} flex items-center justify-center font-bold text-sm">
-                    {{ if eq .Status "RESOLVED" }}<i class="fas fa-check"></i>{{ else }}<i
-                        class="fas fa-ticket-alt"></i>{{ end }}
+            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-3 hover:border-blue-300 transition group flex flex-col gap-3">
+
+            <!-- Baris Atas: Icon & Judul -->
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full flex-shrink-0 {{ if eq .Status " RESOLVED" }}bg-green-100
+                        text-green-600{{ else }}bg-blue-100 text-blue-600{{ end }} flex items-center justify-center
+                        font-bold text-sm">
+                        {{ if eq .Status "RESOLVED" }}<i class="fas fa-check"></i>{{ else }}<i
+                            class="fas fa-ticket-alt"></i>{{ end }}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-700 text-sm group-hover:text-blue-600 transition line-clamp-1">
+                            {{ .Subject }}</h4>
+                        <p class="text-[10px] text-slate-400 mt-0.5">
+                            #{{ .TicketNumber }} &bull;
+                            <span class="{{ if eq .Status " RESOLVED" }}text-green-600{{ else }}text-blue-600{{ end }}
+                                font-bold">{{ .Status }}</span>
+                            &bull; {{ .CreatedAt.Format "02 Jan 15:04" }}
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h4 class="font-bold text-slate-700 text-sm group-hover:text-blue-600 transition">{{ .Subject }}
-                    </h4>
-                    <p class="text-xs text-slate-400">#{{ .TicketNumber }} &bull; {{ .Status }} &bull; {{
-                        .CreatedAt.Format "02 Jan 15:04" }}</p>
-                </div>
+                <!-- Status Priority Badge (Optional) -->
+                {{ if eq .Priority "URGENT_ON_AIR" }}
+                <span
+                    class="text-[9px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase animate-pulse">ON
+                    AIR</span>
+                {{ end }}
             </div>
-            <i class="fas fa-chevron-right text-slate-300"></i>
+
+            <!-- BAGIAN BARU: Thumbnail Bukti Foto -->
+            {{ if .ProofImageURL }}
+            <div class="ml-12 pl-1 border-l-2 border-slate-100">
+                <p class="text-[10px] text-slate-400 mb-1.5 font-medium">Lampiran Bukti:</p>
+                <a href="{{ .ProofImageURL }}" target="_blank"
+                    class="inline-flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition group/img w-full max-w-[200px]">
+                    <!-- Thumbnail Image -->
+                    <img src="{{ .ProofImageURL }}"
+                        class="w-10 h-10 rounded object-cover border border-slate-200 bg-white">
+
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[10px] font-bold text-slate-600 group-hover/img:text-blue-600 truncate">Lihat
+                            Foto</p>
+                        <p class="text-[9px] text-slate-400">Klik untuk memperbesar</p>
+                    </div>
+                    <i class="fas fa-external-link-alt text-slate-300 text-xs mr-2 group-hover/img:text-blue-400"></i>
+                </a>
+            </div>
+            {{ end }}
         </div>
         {{ else }}
         <div class="bg-white p-6 rounded-xl text-center text-slate-400 border border-slate-200 border-dashed">
@@ -157,7 +191,7 @@
         </div>
 
         <!-- Form Content -->
-        <form action="/consumer/ticket" method="POST"
+        <form action="/consumer/ticket" method="POST" enctype="multipart/form-data"
             class="flex-1 overflow-y-auto p-6 space-y-6 bg-white pb-24 sm:pb-6">
 
             <!-- 1. Lokasi -->
@@ -254,16 +288,73 @@
                         class="w-full p-3 border border-slate-300 rounded-xl text-sm h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                         placeholder="Jelaskan apa yang terjadi..."></textarea>
                 </div>
-            </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Lampiran Foto
+                        (Opsional)</label>
 
-            <div class="p-4 border-t border-slate-100 bg-white sticky bottom-0 z-10 -mx-6 -mb-6">
-                <button type="submit"
-                    class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2">
-                    <i class="fas fa-paper-plane"></i> Kirim Laporan
+                    <!-- Container klik -->
+                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition text-slate-400 relative min-h-[120px] flex flex-col items-center justify-center overflow-hidden"
+                        onclick="document.getElementById('proofInput').click()">
+
+                        <!-- Preview Image (Hidden by default) -->
+                        <img id="proofPreview"
+                            class="hidden absolute inset-0 w-full h-full object-cover opacity-80 hover:opacity-100 transition">
+
+                        <!-- Placeholder Icon & Text -->
+                        <div id="proofPlaceholder" class="relative z-10 pointer-events-none">
+                            <i class="fas fa-camera text-2xl mb-2"></i>
+                            <p class="text-xs">Klik untuk ambil foto / upload</p>
+                        </div>
+
+                        <!-- Input File (Hidden) -->
+                        <input type="file" name="proof_image" id="proofInput" class="hidden" accept="image/*"
+                            onchange="previewEvidence(this)">
+                    </div>
+
+                    <!-- Tombol Hapus Foto -->
+                    <button type="button" id="removeProofBtn"
+                        class="hidden text-xs text-red-500 font-bold mt-2 hover:underline" onclick="removeEvidence()">
+                        <i class="fas fa-trash mr-1"></i> Hapus Foto
+                    </button>
+                </div>
+
+                <!-- Tombol Hapus Foto (Muncul jika ada foto) -->
+                <button type="button" id="removeProofBtn"
+                    class="hidden text-xs text-red-500 font-bold mt-2 hover:underline" onclick="removeEvidence()">
+                    <i class="fas fa-trash mr-1"></i> Hapus Foto
                 </button>
             </div>
-        </form>
     </div>
-</div>
 
+    <div class="p-4 border-t border-slate-100 bg-white sticky bottom-0 z-10 -mx-6 -mb-6">
+        <button type="submit"
+            class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2">
+            <i class="fas fa-paper-plane"></i> Kirim Laporan
+        </button>
+    </div>
+    </form>
+</div>
+</div>
+<script>
+    function previewEvidence(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('proofPreview').src = e.target.result;
+                document.getElementById('proofPreview').classList.remove('hidden');
+                document.getElementById('proofPlaceholder').classList.add('hidden', 'opacity-0');
+                document.getElementById('removeProofBtn').classList.remove('hidden');
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function removeEvidence() {
+        document.getElementById('proofInput').value = '';
+        document.getElementById('proofPreview').src = '';
+        document.getElementById('proofPreview').classList.add('hidden');
+        document.getElementById('proofPlaceholder').classList.remove('hidden', 'opacity-0');
+        document.getElementById('removeProofBtn').classList.add('hidden');
+    }
+</script>
 {{ end }}

@@ -42,8 +42,14 @@ func NewRouter() *gin.Engine {
 
 	r.Static("/static", "./web/static")
 	r.Static("/uploads", "./web/uploads")
-
 	// Load Templates
+
+	r.NoRoute(func(c *gin.Context) {
+		c.HTML(http.StatusNotFound, "pages/errors/404.html", gin.H{
+			"title": "Page Not Found",
+		})
+	})
+
 	renderer := loadTemplates()
 	r.HTMLRender = renderer
 
@@ -63,6 +69,7 @@ func NewRouter() *gin.Engine {
 
 	return r
 }
+
 
 func loadTemplates() MultiRender {
 	templates := make(map[string]*template.Template)

@@ -5,7 +5,10 @@ import (
 	"it-broadcast-ops/internal/database"
 	"it-broadcast-ops/internal/models"
 	"net/http"
-
+	"os"
+	"path/filepath"
+	"time"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -71,20 +74,56 @@ func CreateTicket(c *gin.Context) {
 	userIDStr, _ := c.Cookie("user_id")
 	userID, _ := uuid.Parse(userIDStr)
 
+	var proofURL string
+    file, err := c.FormFile("proof_image")
+    if err == nil {
+        // 1. Validasi Ukuran (Max 5MB)
+        if file.Size > 5*1024*1024 {
+             // Opsional: Handle error file terlalu besar
+        } else {
+            // 2. Buat nama file unik: evidence_<timestamp>.<ext>
+            ext := filepath.Ext(file.Filename)
+            filename := fmt.Sprintf("evidence_%d%s", time.Now().UnixNano(), ext)
+            
+            // 3. Pastikan folder uploads/tickets ada
+            saveDir := "web/uploads/tickets"
+            os.MkdirAll(saveDir, 0755)
+            
+            savePath := filepath.Join(saveDir, filename)
+            
+            // 4. Simpan file
+            if err := c.SaveUploadedFile(file, savePath); err == nil {
+                // Simpan URL relatif untuk akses web
+                proofURL = "/uploads/tickets/" + filename
+            }
+        }
+    }
+	category := c.PostForm("category")
+	validCategories := map[string]bool{
+		"AUDIO": true, "VIDEO": true, "IT_NETWORK": true, "SOFTWARE": true, "ELECTRICAL": true,
+	}
+	if !validCategories[category] {
+		category = "IT_NETWORK" // Default fallback jika invalid
+	}
+	
 	ticket := models.Ticket{
 		Location:    models.LocationEnum(c.PostForm("location")), // Simplified mapping
 		// Urgency -> Priority mapping needs care, for now assume compatible strings or map manually
 		Priority:    models.PriorityNormal, // Default
-		Category:    c.PostForm("category"),
+		Category:    category,
 		Subject:     c.PostForm("subject"),
 		Description: c.PostForm("description"),
-		RequesterID: userID,
-		Status:      models.StatusOpen,
+		ProofImageURL: proofURL, // <--- Masukkan URL gambar di sini
+		RequesterID:   userID,
+		Status:        models.StatusOpen,
+        CreatedAt:     time.Now(), // Pastikan created_at terisi
 	}
 	
 	if c.PostForm("urgency") == "ON_AIR_EMERGENCY" {
 		ticket.Priority = models.PriorityUrgentOnAir
-	}
+	} else if c.PostForm("urgency") == "PRE_PRODUCTION" { // Tambahan jika ada opsi ini
+        ticket.Priority = models.PriorityHigh
+    }
 
 	if err := database.DB.Create(&ticket).Error; err != nil {
 		c.JSON(500, gin.H{"error": "Failed to create ticket: " + err.Error()})
