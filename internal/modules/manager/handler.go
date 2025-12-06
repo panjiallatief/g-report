@@ -20,12 +20,27 @@ func RegisterRoutes(r *gin.Engine) {
 	managerGroup := r.Group("/manager")
 	managerGroup.Use(auth.AuthRequired(), auth.RoleRequired(models.RoleManager))
 	{
-	managerGroup.POST("/shifts/create", CreateShift)
-
 	managerGroup.GET("", Dashboard)
-	managerGroup.POST("/articles/:id/verify", VerifyArticle)
-	managerGroup.POST("/shifts/import", ImportSchedule)
-	managerGroup.POST("/routines/create", CreateRoutine)
+		
+		// Shift Routes
+		managerGroup.POST("/shifts/create", CreateShift)
+		managerGroup.POST("/shifts/import", ImportSchedule)
+		
+		// Routine Routes
+		managerGroup.POST("/routines/create", CreateRoutine)
+
+		// Big Book Routes
+		managerGroup.GET("/articles/:id/json", GetArticleJSON) 
+		managerGroup.POST("/articles/create", CreateArticle)
+		managerGroup.POST("/articles/:id/verify", VerifyArticle)
+		managerGroup.POST("/articles/:id/deny", DenyArticle)     // Handler ini yang sebelumnya hilang
+		managerGroup.POST("/articles/:id/update", UpdateArticle)
+		managerGroup.POST("/articles/:id/delete", DeleteArticle) // Handler ini juga
+		
+		// Ticket Conversion
+		managerGroup.POST("/tickets/:id/convert", ConvertTicketToArticle)
+		managerGroup.POST("/tickets/:id/deny", DenyTicket) 
+
 	}
 }
 
@@ -445,7 +460,6 @@ func ConvertTicketToArticle(c *gin.Context) {
 
 	c.Redirect(http.StatusFound, "/manager")
 }
-
 // 3. Create Manual Article
 func CreateArticle(c *gin.Context) {
 	title := c.PostForm("title")
@@ -486,18 +500,42 @@ func VerifyArticle(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/manager")
 }
 
-// 6. Deny Article (Hapus Draft)
+
+// DenyArticle: Menolak artikel yang masih draft/pending. 
+// Logikanya adalah menghapus artikel tersebut dari tabel knowledge_articles.
 func DenyArticle(c *gin.Context) {
 	id := c.Param("id")
-	// Hard delete: Hapus permanen dari DB agar tidak menumpuk sampah
-	database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id)
+	// Hapus artikel berdasarkan ID
+	if err := database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id).Error; err != nil {
+		// Anda bisa menambahkan logging error di sini
+		c.Redirect(http.StatusFound, "/manager?error=DeleteFailed")
+		return
+	}
 	c.Redirect(http.StatusFound, "/manager")
 }
 
-// 7. Delete Published Article
+func DenyTicket(c *gin.Context) {
+	id := c.Param("id")
+	
+	// Update flag is_converted_to_article menjadi true agar tidak muncul lagi di dashboard
+	// Kita anggap "Deny" pada tiket kandidat berarti "Abaikan saran ini"
+	if err := database.DB.Model(&models.Ticket{}).Where("id = ?", id).Update("is_converted_to_article", true).Error; err != nil {
+		c.Redirect(http.StatusFound, "/manager?error=UpdateFailed")
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/manager")
+}
+
+
+// DeleteArticle: Menghapus artikel yang sudah dipublikasikan.
+// Logikanya sama dengan Deny, yaitu menghapus dari database.
 func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
-	database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id)
+	if err := database.DB.Delete(&models.KnowledgeArticle{}, "id = ?", id).Error; err != nil {
+		c.Redirect(http.StatusFound, "/manager?error=DeleteFailed")
+		return
+	}
 	c.Redirect(http.StatusFound, "/manager")
 }
 

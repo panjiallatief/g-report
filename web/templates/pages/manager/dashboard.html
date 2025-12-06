@@ -1,5 +1,69 @@
 {{ define "content" }}
-<div class="min-h-screen bg-slate-100 pl-0 md:pl-64 fade-in font-sans">
+<div class="min-h-screen bg-slate-100 pl-0 md:pl-64 fade-in font-sans" x-data="{ 
+        // State untuk Modal Review (Approval Queue)
+        reviewModalOpen: false, 
+        reviewArticle: { id: '', title: '', author: '', category: '', content: '', type: '' },
+        
+        // State untuk Modal Artikel (View/Edit/New)
+        modals: { new: false, view: false, edit: false },
+        activeArticle: { id: '', title: '', category: '', content: '', author: '', date: '' },
+
+        // --- Fungsi Review (Approval Queue) ---
+        openReview(id, title, author, category, content, type) {
+            this.reviewArticle = { id, title, author, category, content, type };
+            this.reviewModalOpen = true;
+        },
+
+        getApproveAction() {
+            if (this.reviewArticle.type === 'ticket') {
+                return '/manager/tickets/' + this.reviewArticle.id + '/convert';
+            }
+            return '/manager/articles/' + this.reviewArticle.id + '/verify';
+        },
+
+        getDenyAction() {
+            if (this.reviewArticle.type === 'ticket') {
+                return '/manager/tickets/' + this.reviewArticle.id + '/deny';
+            }
+            return '/manager/articles/' + this.reviewArticle.id + '/deny';
+        },
+
+        confirmDeny(e) {
+            if (this.reviewArticle.type === 'ticket') {
+                if (!confirm('Abaikan saran tiket ini? (Akan hilang dari daftar shortcut)')) {
+                    e.preventDefault();
+                }
+            } else {
+                if (!confirm('Tolak dan hapus draft artikel ini secara permanen?')) {
+                    e.preventDefault();
+                }
+            }
+        },
+
+        // --- Fungsi Artikel (Published List) ---
+        
+        // Buka Modal New
+        openNewModal() {
+            this.modals.new = true;
+        },
+
+        // Fetch Data & Buka Modal View/Edit
+        async fetchAndOpen(type, id) {
+            try {
+                // Fetch data JSON dari backend agar aman dari karakter aneh di HTML
+                const res = await fetch(`/manager/articles/${id}/json`);
+                if(res.ok) {
+                    this.activeArticle = await res.json();
+                    this.modals[type] = true; // type bisa 'view' atau 'edit'
+                } else {
+                    alert('Gagal mengambil data artikel.');
+                }
+            } catch(e) {
+                console.error(e);
+                alert('Terjadi kesalahan koneksi.');
+            }
+        }
+     }">
 
     <!-- Sidebar -->
     <aside class="hidden md:block fixed left-0 top-0 h-full w-64 bg-slate-900 text-white z-10 shadow-xl">
@@ -224,28 +288,72 @@
                     </div>
                 </div>
 
+                <!-- PENDING APPROVAL CARD (Updated to Table with Modal Trigger) -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <h3 class="font-bold text-slate-800">Pending Approval</h3>
+                        <h3 class="font-bold text-slate-800">Review Queue</h3>
                         <span class="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded">{{
-                            .newArticlesCount }} Articles</span>
+                            .newArticlesCount }} Items</span>
                     </div>
-                    <div class="divide-y divide-slate-100">
-                        {{ range .pendingArticles }}
-                        <div class="p-4 hover:bg-slate-50 cursor-pointer" onclick="switchManagerTab('bigbook')">
-                            <h4 class="font-bold text-sm text-slate-700">{{ .Title }}</h4>
-                            <p class="text-xs text-slate-500">Author: {{ .Author.FullName }} &bull; {{ .CreatedAt.Format
-                                "15:04" }}</p>
-                        </div>
-                        {{ else }}
-                        <div class="p-6 text-center text-slate-400 text-sm">
-                            Tidak ada artikel yang perlu verifikasi.
-                        </div>
-                        {{ end }}
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <tbody class="divide-y divide-slate-100">
+                                <!-- 1. Candidates from Tickets (Prioritas) -->
+                                {{ range .candidateTickets }}
+                                <tr class="hover:bg-indigo-50 transition cursor-pointer group"
+                                    @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket #{{ .TicketNumber }})', '{{ .Category }}', '{{ .Solution }}', 'ticket')">
+                                    <td class="px-6 py-4">
+                                        <span class="block text-xs text-indigo-600 font-bold mb-1">FROM TICKET #{{
+                                            .TicketNumber }}</span>
+                                        <span class="font-bold text-slate-700 group-hover:text-indigo-700">{{ .Subject
+                                            }}</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <!-- Tombol View/Review (Gunakan button, bukan span) -->
+                                        <button type="button"
+                                            class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold group-hover:bg-indigo-600 group-hover:text-white transition">Review</button>
+                                    </td>
+                                </tr>
+                                {{ end }}
+
+                                <!-- 2. Manual Drafts -->
+                                {{ range .pendingArticles }}
+                                <tr class="hover:bg-slate-50 transition cursor-pointer group"
+                                    @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')">
+                                    <td class="px-6 py-4">
+                                        <span class="block text-xs text-slate-400 mb-1">DRAFT BY {{ .Author.FullName
+                                            }}</span>
+                                        <span class="font-bold text-slate-700">{{ .Title }}</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <!-- Tombol View/Review (Gunakan button, bukan span) -->
+                                        <button type="button"
+                                            class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold group-hover:bg-slate-600 group-hover:text-white transition">Review</button>
+                                    </td>
+                                </tr>
+                                {{ end }}
+
+                                {{ if and (not .candidateTickets) (not .pendingArticles) }}
+                                <tr>
+                                    <td colspan="2" class="p-8 text-center text-slate-400 italic">
+                                        <i class="fas fa-check-circle text-2xl mb-2 text-green-400"></i>
+                                        <p>All clear! Nothing to review.</p>
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Quick Link to Big Book Tab -->
+                    <div class="p-3 bg-slate-50 border-t border-slate-100 text-center">
+                        <button class="text-xs font-bold text-slate-500 hover:text-slate-800"
+                            onclick="switchManagerTab('bigbook')">Manage All Articles</button>
                     </div>
                 </div>
             </div>
         </div>
+
 
         <!-- 3.2 SHIFT MANAGEMENT VIEW (UNCHANGED) -->
         <div id="manager-content-shifts" class="hidden fade-in">
@@ -317,46 +425,78 @@
             </div>
         </div>
 
-        <!-- 3.3 BIG BOOK WIKI VIEW -->
+        <!-- 3.3 BIG BOOK WIKI VIEW (UPDATED) -->
         <div id="manager-content-bigbook" class="hidden fade-in">
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="text-2xl font-bold text-slate-800">Big Book Wiki</h2>
                     <p class="text-slate-500 text-sm">Knowledge Base & Approval System</p>
                 </div>
+                <!-- TOMBOL NEW ARTICLE (Memanggil openNewModal) -->
+                <button @click="openNewModal()"
+                    class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200 transition transform active:scale-95">
+                    <i class="fas fa-plus mr-2"></i> New Article
+                </button>
             </div>
 
-           <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <!-- REUSED: Review Queue (Gabungan Ticket Candidates & Pending Articles) -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
                 <div class="p-4 border-b border-slate-100 bg-orange-50 flex items-center gap-2">
                     <i class="fas fa-clock text-orange-500"></i>
-                    <h3 class="font-bold text-orange-800 text-sm">Pending Verification ({{ .newArticlesCount }})</h3>
+                    <h3 class="font-bold text-orange-800 text-sm">Review Queue</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
                             <tr>
+                                <th class="px-6 py-3">Type</th>
                                 <th class="px-6 py-3">Title</th>
-                                <th class="px-6 py-3">Author</th>
-                                <th class="px-6 py-3">Category</th>
-                                <th class="px-6 py-3">Date</th>
+                                <th class="px-6 py-3">Author/Source</th>
                                 <th class="px-6 py-3 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            {{ range .pendingArticles }}
-                            <tr class="hover:bg-slate-50 transition cursor-pointer"
-                                @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}')">
-                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Title }}</td>
-                                <td class="px-6 py-4">{{ .Author.FullName }}</td>
-                                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{{ .Category }}</span></td>
-                                <td class="px-6 py-4 text-slate-500">{{ .CreatedAt.Format "02 Jan 15:04" }}</td>
+                            <!-- 1. Candidates from Tickets -->
+                            {{ range .candidateTickets }}
+                            <tr class="hover:bg-indigo-50 transition cursor-pointer group">
+                                <td class="px-6 py-4"><span
+                                        class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">TICKET</span>
+                                </td>
+                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Subject }}</td>
+                                <td class="px-6 py-4 text-slate-500">Ticket #{{ .TicketNumber }}</td>
                                 <td class="px-6 py-4 text-right">
-                                    <button class="text-blue-600 font-bold hover:underline">Review</button>
+                                    <!-- TOMBOL REVIEW TIKET -->
+                                    <button type="button"
+                                        @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket)', '{{ .Category }}', '{{ .Solution }}', 'ticket')"
+                                        class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold hover:bg-indigo-600 hover:text-white transition shadow-sm">
+                                        Review
+                                    </button>
                                 </td>
                             </tr>
-                            {{ else }}
+                            {{ end }}
+
+                            <!-- 2. Pending Drafts -->
+                            {{ range .pendingArticles }}
+                            <tr class="hover:bg-slate-50 transition cursor-pointer group">
+                                <td class="px-6 py-4"><span
+                                        class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">DRAFT</span>
+                                </td>
+                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Title }}</td>
+                                <td class="px-6 py-4 text-slate-500">{{ .Author.FullName }}</td>
+                                <td class="px-6 py-4 text-right">
+                                    <!-- TOMBOL REVIEW ARTIKEL -->
+                                    <button type="button"
+                                        @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')"
+                                        class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold hover:bg-slate-600 hover:text-white transition shadow-sm">
+                                        Review
+                                    </button>
+                                </td>
+                            </tr>
+                            {{ end }}
+
+                            {{ if and (not .candidateTickets) (not .pendingArticles) }}
                             <tr>
-                                <td colspan="5" class="p-6 text-center text-slate-400">Tidak ada artikel pending.</td>
+                                <td colspan="4" class="p-6 text-center text-slate-400 italic">Nothing to review.</td>
                             </tr>
                             {{ end }}
                         </tbody>
@@ -364,7 +504,7 @@
                 </div>
             </div>
 
-            <!-- Published List -->
+            <!-- Published List (UPDATED: Added View & Edit Buttons) -->
             <h3 class="font-bold text-slate-700 mb-4">Published Articles</h3>
             <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                 <table class="w-full text-sm text-left">
@@ -373,20 +513,38 @@
                             <th class="px-6 py-3">Title</th>
                             <th class="px-6 py-3">Category</th>
                             <th class="px-6 py-3">Views</th>
-                            <th class="px-6 py-3">Action</th>
+                            <th class="px-6 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         {{ range .publishedArticles }}
-                        <tr>
-                            <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer">{{ .Title }}
+                        <tr class="group hover:bg-slate-50 transition">
+                            <!-- Klik Judul -> View Detail -->
+                            <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer"
+                                @click="fetchAndOpen('view', '{{ .ID }}')">
+                                {{ .Title }}
                             </td>
                             <td class="px-6 py-3"><span
                                     class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">{{
                                     .Category }}</span></td>
                             <td class="px-6 py-3">{{ .ViewsCount }}</td>
-                            <td class="px-6 py-3"><button class="text-slate-400 hover:text-blue-500"><i
-                                        class="fas fa-edit"></i></button></td>
+                            <td class="px-6 py-3 text-right flex justify-end gap-2">
+                                <!-- Tombol Edit -->
+                                <button type="button" @click="fetchAndOpen('edit', '{{ .ID }}')"
+                                    class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center transition shadow-sm"
+                                    title="Edit Article">
+                                    <i class="fas fa-pen text-xs"></i>
+                                </button>
+                                <!-- Tombol Delete -->
+                                <form action="/manager/articles/{{ .ID }}/delete" method="POST"
+                                    onsubmit="return confirm('Hapus artikel ini permanen?')" class="inline">
+                                    <button type="submit"
+                                        class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shadow-sm"
+                                        title="Delete Article">
+                                        <i class="fas fa-trash text-xs"></i>
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                         {{ else }}
                         <tr>
@@ -484,7 +642,8 @@
                         {{ range .routineTemplates }}
                         <tr class="hover:bg-slate-50 transition">
                             <td class="px-6 py-4 font-bold text-slate-800">{{ .Title }}</td>
-                            <td class="px-6 py-4 font-mono text-xs bg-slate-50 rounded text-slate-600">{{ .CronSchedule
+                            <td class="px-6 py-4 font-mono text-xs bg-slate-50 rounded text-slate-600">{{
+                                .CronSchedule
                                 }}</td>
                             <td class="px-6 py-4">{{ .DeadlineMinutes }} mins</td>
                             <td class="px-6 py-4 text-center">
@@ -558,62 +717,187 @@
             </div>
         </div>
 
-        <!-- REVIEW ARTICLE MODAL -->
-    <div x-show="reviewModalOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4 fade-in" style="display: none;">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="reviewModalOpen = false"></div>
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10">
-            
-            <!-- Header -->
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <div>
-                    <h3 class="font-bold text-slate-800 text-lg">Review Article</h3>
-                    <p class="text-xs text-slate-500">Approve to publish, Edit to refine, or Deny to delete.</p>
-                </div>
-                <button @click="reviewModalOpen = false" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
-            </div>
+        <!-- ================= MODALS ================= -->
 
-            <!-- Scrollable Content -->
-            <div class="flex-1 overflow-y-auto p-8 bg-white">
-                <div class="mb-6">
-                    <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase" x-text="reviewArticle.category"></span>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-2 mb-1" x-text="reviewArticle.title"></h2>
-                    <p class="text-sm text-slate-500">Draft by <span class="font-bold text-slate-700" x-text="reviewArticle.author"></span></p>
+        <!-- 1. VIEW ARTICLE MODAL (Detail Published) -->
+        <div x-show="modals.view" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+            style="display: none;">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.view = false"></div>
+            <div
+                class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+                    <div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span
+                                class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                x-text="activeArticle.category"></span>
+                            <span class="text-xs text-slate-400" x-text="activeArticle.date"></span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-xl" x-text="activeArticle.title"></h3>
+                        <p class="text-xs text-slate-500 mt-1">Author: <span x-text="activeArticle.author"></span></p>
+                    </div>
+                    <button @click="modals.view = false" class="text-slate-400 hover:text-red-500 transition"><i
+                            class="fas fa-times text-xl"></i></button>
                 </div>
-                
-                <div class="prose prose-sm prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap" x-text="reviewArticle.content">
+                <div class="flex-1 p-8 overflow-y-auto bg-white">
+                    <div class="prose prose-sm prose-slate max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed"
+                        x-text="activeArticle.content"></div>
                 </div>
-            </div>
-
-            <!-- Footer Actions -->
-            <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
-                
-                <!-- Action Group Kiri: Deny -->
-                <form :action="'/manager/articles/' + reviewArticle.id + '/deny'" method="POST" onsubmit="return confirm('Tolak dan hapus artikel ini?')">
-                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition">
-                        <i class="fas fa-times mr-2"></i> Deny
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                    <button @click="modals.view = false; fetchAndOpen('edit', activeArticle.id)"
+                        class="text-blue-600 font-bold text-sm hover:underline px-4 py-2">
+                        <i class="fas fa-edit mr-1"></i> Edit
                     </button>
+                    <button @click="modals.view = false"
+                        class="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-300 transition">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. CREATE NEW ARTICLE MODAL -->
+        <div x-show="modals.new" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+            style="display: none;">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.new = false"></div>
+            <div
+                class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Write New Article</h3>
+                    <button @click="modals.new = false" class="text-slate-400 hover:text-red-500"><i
+                            class="fas fa-times"></i></button>
+                </div>
+                <form action="/manager/articles/create" method="POST" class="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
+                        <input type="text" name="title" required
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label
+                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                        <select name="category"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="AUDIO">Audio</option>
+                            <option value="VIDEO">Video</option>
+                            <option value="IT_NETWORK">IT Network</option>
+                            <option value="SOFTWARE">Software</option>
+                            <option value="ELECTRICAL">Electrical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
+                        <textarea name="content" required
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                    </div>
+                    <div class="pt-2"><button type="submit"
+                            class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">Publish
+                            Now</button></div>
                 </form>
+            </div>
+        </div>
 
-                <!-- Action Group Kanan: Edit & Approve -->
-                <div class="flex gap-2">
-                    <!-- Tombol Edit (Placeholder logic for edit) -->
-                    <!-- In a real scenario, you'd open another modal or turn this into edit mode. For now, simple edit not fully implemented in this block but structure is here -->
-                    <button type="button" 
-                            class="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 border border-slate-300 hover:bg-slate-50 transition"
-                            onclick="alert('Edit functionality coming in next update!')">
-                        <i class="fas fa-edit mr-2"></i> Edit
-                    </button>
+        <!-- 3. EDIT ARTICLE MODAL -->
+        <div x-show="modals.edit" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+            style="display: none;">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.edit = false"></div>
+            <div
+                class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Edit Article</h3>
+                    <button @click="modals.edit = false" class="text-slate-400 hover:text-red-500"><i
+                            class="fas fa-times"></i></button>
+                </div>
+                <form :action="'/manager/articles/' + activeArticle.id + '/update'" method="POST"
+                    class="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
+                        <input type="text" name="title" x-model="activeArticle.title" required
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label
+                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                        <select name="category" x-model="activeArticle.category"
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="AUDIO">Audio</option>
+                            <option value="VIDEO">Video</option>
+                            <option value="IT_NETWORK">IT Network</option>
+                            <option value="SOFTWARE">Software</option>
+                            <option value="ELECTRICAL">Electrical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
+                        <textarea name="content" x-model="activeArticle.content" required
+                            class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                    </div>
+                    <div class="pt-2"><button type="submit"
+                            class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition">Save
+                            Changes</button></div>
+                </form>
+            </div>
+        </div>
 
-                    <!-- Form Approve -->
-                    <form :action="'/manager/articles/' + reviewArticle.id + '/verify'" method="POST">
-                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition">
-                            <i class="fas fa-check mr-2"></i> Approve
+        <!-- REVIEW ARTICLE MODAL (POPUP) -->
+        <div x-show="reviewModalOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4 fade-in"
+            style="display: none;">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="reviewModalOpen = false"></div>
+            <div
+                class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10">
+
+                <!-- Header -->
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg">Review Item</h3>
+                        <!-- Teks dinamis berdasarkan tipe -->
+                        <p class="text-xs text-slate-500"
+                            x-text="reviewArticle.type === 'ticket' ? 'Convert ticket solution to article or ignore.' : 'Approve draft to publish or delete.'">
+                        </p>
+                    </div>
+                    <button @click="reviewModalOpen = false" class="text-slate-400 hover:text-slate-600"><i
+                            class="fas fa-times text-xl"></i></button>
+                </div>
+
+                <!-- Scrollable Content -->
+                <div class="flex-1 overflow-y-auto p-8 bg-white">
+                    <div class="mb-6">
+                        <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase"
+                            x-text="reviewArticle.category"></span>
+                        <h2 class="text-2xl font-bold text-slate-800 mt-2 mb-1" x-text="reviewArticle.title"></h2>
+                        <p class="text-sm text-slate-500">Source: <span class="font-bold text-slate-700"
+                                x-text="reviewArticle.author"></span></p>
+                    </div>
+
+                    <div class="prose prose-sm prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap"
+                        x-text="reviewArticle.content">
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
+
+                    <!-- DENY FORM -->
+                    <form :action="getDenyAction()" method="POST" @submit="confirmDeny">
+
+                        <button type="submit"
+                            class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition flex items-center gap-2">
+                            <i class="fas fa-times"></i>
+                            <span x-text="reviewArticle.type === 'ticket' ? 'Ignore / Remove' : 'Deny & Delete'"></span>
+                        </button>
+                    </form>
+
+                    <!-- APPROVE FORM -->
+                    <form :action="getApproveAction()" method="POST">
+                        <button type="submit"
+                            class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition flex items-center gap-2">
+                            <i class="fas fa-check"></i> <span
+                                x-text="reviewArticle.type === 'ticket' ? 'Convert to Article' : 'Approve & Publish'"></span>
                         </button>
                     </form>
                 </div>
             </div>
         </div>
-    </div>
 
         <!-- NEW ROUTINE MODAL -->
         <div id="new-routine-modal"
