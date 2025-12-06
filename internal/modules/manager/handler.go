@@ -65,37 +65,76 @@ func CreateShift(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/manager")
 }
 
+type ChartData struct {
+	Labels   []string `json:"labels"`   // ["Mon", "Tue", "Wed"...]
+	Incoming []int64  `json:"incoming"` // [5, 12, 8...]
+	Resolved []int64  `json:"resolved"` // [4, 10, 7...]
+}
+
 func Dashboard(c *gin.Context) {
-	// 1. KPI Calculations (Naive implementation for MVP)
-	// MTTA: Avg time from CreatedAt to FirstResponseAt
+
+	period := c.DefaultQuery("period", "this_month")
+	var startDate time.Time
+	now := time.Now()
+
+	if period == "last_month" {
+		startDate = now.AddDate(0, -1, 0) // Mundur 1 bulan
+	} else {
+		startDate = now.AddDate(0, 0, -30) // Default 30 hari terakhir
+	}
+	
+	// MTTA
 	var mttaPtr *float64
-	database.DB.Model(&models.Ticket{}).Select("AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/60)").
-		Where("first_response_at IS NOT NULL").Scan(&mttaPtr)
-	
+	database.DB.Model(&models.Ticket{}).
+		Select("AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/60)").
+		Where("first_response_at IS NOT NULL AND created_at >= ?", startDate).
+		Scan(&mttaPtr)
 	mtta := 0.0
-	if mttaPtr != nil {
-		mtta = *mttaPtr
-	}
+	if mttaPtr != nil { mtta = *mttaPtr }
 
-	// MTTR: Avg time from CreatedAt to ResolvedAt
+	// MTTR
 	var mttrPtr *float64
-	database.DB.Model(&models.Ticket{}).Select("AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60)").
-		Where("resolved_at IS NOT NULL").Scan(&mttrPtr)
-
+	database.DB.Model(&models.Ticket{}).
+		Select("AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60)").
+		Where("resolved_at IS NOT NULL AND created_at >= ?", startDate).
+		Scan(&mttrPtr)
 	mttr := 0.0
-	if mttrPtr != nil {
-		mttr = *mttrPtr
-	}
-	
-	// FCR: (Tickets Resolved without Handover / Total Resolved) * 100
+	if mttrPtr != nil { mttr = *mttrPtr }
+
+	// FCR Calculation
 	var totalResolved int64
 	var fcrCount int64
-	database.DB.Model(&models.Ticket{}).Where("status = ?", models.StatusResolved).Count(&totalResolved)
-	database.DB.Model(&models.Ticket{}).Where("status = ? AND is_handover = ?", models.StatusResolved, false).Count(&fcrCount)
+	database.DB.Model(&models.Ticket{}).Where("status = ? AND created_at >= ?", models.StatusResolved, startDate).Count(&totalResolved)
+	database.DB.Model(&models.Ticket{}).Where("status = ? AND is_handover = ? AND created_at >= ?", models.StatusResolved, false, startDate).Count(&fcrCount)
 	
 	fcrRate := 0.0
 	if totalResolved > 0 {
 		fcrRate = (float64(fcrCount) / float64(totalResolved)) * 100
+	}
+
+	chartData := ChartData{
+		Labels:   make([]string, 7),
+		Incoming: make([]int64, 7),
+		Resolved: make([]int64, 7),
+	}
+
+	for i := 6; i >= 0; i-- {
+		dayDate := now.AddDate(0, 0, -i)
+		dayStart := time.Date(dayDate.Year(), dayDate.Month(), dayDate.Day(), 0, 0, 0, 0, dayDate.Location())
+		dayEnd := dayStart.Add(24 * time.Hour)
+		
+		idx := 6 - i
+		chartData.Labels[idx] = dayDate.Format("Mon") // "Mon", "Tue"
+
+		// Count Incoming
+		database.DB.Model(&models.Ticket{}).
+			Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
+			Count(&chartData.Incoming[idx])
+
+		// Count Resolved
+		database.DB.Model(&models.Ticket{}).
+			Where("resolved_at >= ? AND resolved_at < ?", dayStart, dayEnd).
+			Count(&chartData.Resolved[idx])
 	}
 
 	// SLA Compliance Stats
@@ -105,7 +144,9 @@ func Dashboard(c *gin.Context) {
 		CompliantTickets int
 		ComplianceRate   float64
 	}
-	var slaMetrics []SLAMetric
+	
+    var slaMetrics []interface{}
+	// Removed redeclared variables here (allStaff, routineTemplates) to fix error
 
 	// Query for Urgent (15 mins)
 	var urgentStats SLAMetric
@@ -141,7 +182,8 @@ func Dashboard(c *gin.Context) {
 	var articleCount int64
 	var newArticlesCount int64
 	database.DB.Model(&models.KnowledgeArticle{}).Count(&articleCount)
-	database.DB.Model(&models.KnowledgeArticle{}).Where("is_verified = ?", false).Count(&newArticlesCount) // Pending
+	database.DB.Model(&models.KnowledgeArticle{}).Where("is_verified = ?", false).Count(&newArticlesCount)
+	// Removed premature 'pendingArticles' Find call here to fix undefined error
 
 	// 2. Pending Articles for Verification
 	var pendingArticles []models.KnowledgeArticle
@@ -159,7 +201,7 @@ func Dashboard(c *gin.Context) {
 	var upcomingShifts []ShiftView
 	
 	var dbShifts []models.Shift
-	now := time.Now()
+	// Removed 'now := time.Now()' here to fix no new variables error
 	nextWeek := now.Add(7 * 24 * time.Hour) // Show next 7 days
 	
 	// Fetch shifts starting from today (start of day to capture current) until next week
@@ -256,21 +298,23 @@ func Dashboard(c *gin.Context) {
 	database.DB.Find(&routineTemplates)
 
 	c.HTML(http.StatusOK, "manager/dashboard.html", gin.H{
-		"title": "Manager Dashboard",
-		"mtta": int(mtta),
-		"mttr": int(mttr),
-		"fcr": int(fcrRate),
-		"articleCount": articleCount,
-		"pendingArticles": pendingArticles,
-		"newArticlesCount": newArticlesCount,
-		"upcomingShifts": upcomingShifts,
-		"activeShift": activeShift,
-		"hasActiveShift": hasActiveShift,
+		"title":             "Manager Dashboard",
+		"mtta":              int(mtta),
+		"mttr":              int(mttr),
+		"fcr":               int(fcrRate),
+		"period":            period, // Kirim balik ke UI untuk set selected option
+		"chartData":         chartData, // Data Chart
+		"articleCount":      articleCount,
+		"newArticlesCount":  newArticlesCount,
+		"pendingArticles":   pendingArticles,
+		"upcomingShifts":    upcomingShifts,
+		"activeShift":       activeShift,
+		"hasActiveShift":    hasActiveShift,
 		"publishedArticles": publishedArticles,
-		"staffPerformance": staffPerformance,
-		"allStaff": allStaff,
-		"slaMetrics": slaMetrics,
-		"routineTemplates": routineTemplates,
+		"staffPerformance":  staffPerformance,
+		"allStaff":          allStaff,
+		"slaMetrics":        slaMetrics,
+		"routineTemplates":  routineTemplates,
 	})
 }
 
