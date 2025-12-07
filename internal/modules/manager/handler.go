@@ -20,30 +20,149 @@ func RegisterRoutes(r *gin.Engine) {
 	managerGroup := r.Group("/manager")
 	managerGroup.Use(auth.AuthRequired(), auth.RoleRequired(models.RoleManager))
 	{
-	managerGroup.GET("", Dashboard)
+		managerGroup.GET("", Dashboard)
 		
+		// Reports & Templates (NEW)
+		managerGroup.GET("/reports/export", ExportReport)
+		managerGroup.GET("/shifts/template", DownloadShiftTemplate)
+
 		// Shift Routes
 		managerGroup.POST("/shifts/create", CreateShift)
 		managerGroup.POST("/shifts/import", ImportSchedule)
 		
 		// Routine Routes
 		managerGroup.POST("/routines/create", CreateRoutine)
-		managerGroup.POST("/routines/:id/delete", DeleteRoutine) // NEW
-		managerGroup.POST("/routines/:id/toggle-active", ToggleRoutine) // NEW
+		managerGroup.POST("/routines/:id/delete", DeleteRoutine)
+		managerGroup.POST("/routines/:id/toggle-active", ToggleRoutine)
 
 		// Big Book Routes
 		managerGroup.GET("/articles/:id/json", GetArticleJSON) 
 		managerGroup.POST("/articles/create", CreateArticle)
 		managerGroup.POST("/articles/:id/verify", VerifyArticle)
-		managerGroup.POST("/articles/:id/deny", DenyArticle)     // Handler ini yang sebelumnya hilang
+		managerGroup.POST("/articles/:id/deny", DenyArticle)
 		managerGroup.POST("/articles/:id/update", UpdateArticle)
-		managerGroup.POST("/articles/:id/delete", DeleteArticle) // Handler ini juga
+		managerGroup.POST("/articles/:id/delete", DeleteArticle)
 		
 		// Ticket Conversion
 		managerGroup.POST("/tickets/:id/convert", ConvertTicketToArticle)
 		managerGroup.POST("/tickets/:id/deny", DenyTicket) 
-
 	}
+}
+// [NEW] Handler untuk Download Report Tiket ke CSV (Excel Compatible)
+func ExportReport(c *gin.Context) {
+	// 1. Set Header agar browser menganggap ini file download
+	filename := fmt.Sprintf("operational_report_%s.csv", time.Now().Format("20060102_1504"))
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Content-Type", "text/csv")
+
+	// 2. Inisialisasi CSV Writer
+	writer := csv.NewWriter(c.Writer)
+	
+	// 3. Tulis Header CSV
+	// Header ini akan menjadi kolom di Excel
+	headers := []string{
+		"Ticket No", "Subject", "Category", "Location", 
+		"Status", "Priority", "Requester", "Processed By", // Updated: Menampilkan siapa yang resolve/handover
+		"Created At", "Resolved At", "Response Time (Mins)", "Duration (Mins)", "Solution",
+	}
+	if err := writer.Write(headers); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to write header"})
+		return
+	}
+
+	// 4. Query Data Tiket (Bisa ditambah filter by date query param jika perlu)
+	var tickets []models.Ticket
+	database.DB.Preload("Requester").
+		Order("created_at desc").
+		Find(&tickets)
+
+	// 5. Loop dan Tulis Baris Data
+	for _, t := range tickets {
+		// Format Waktu
+		createdAt := t.CreatedAt.Format("2006-01-02 15:04")
+		resolvedAt := "-"
+		duration := "0"
+		responseTime := "0"
+
+		if t.ResolvedAt != nil {
+			resolvedAt = t.ResolvedAt.Format("2006-01-02 15:04")
+			dur := t.ResolvedAt.Sub(t.CreatedAt).Minutes()
+			duration = fmt.Sprintf("%.0f", dur)
+		}
+
+		if t.FirstResponseAt != nil {
+			res := t.FirstResponseAt.Sub(t.CreatedAt).Minutes()
+			responseTime = fmt.Sprintf("%.0f", res)
+		}
+
+		// LOGIKA PENCARIAN PROCESSED BY
+		processedBy := "-"
+		
+		// Skenario 1: Tiket Selesai (Cari Resolver)
+		if t.Status == models.StatusResolved || t.Status == models.StatusClosed {
+			var act models.TicketActivity
+			// Cari aktivitas RESOLVE terakhir untuk tiket ini
+			if err := database.DB.Preload("Actor").
+				Where("ticket_id = ? AND action_type = ?", t.ID, "RESOLVE").
+				Order("created_at desc").
+				First(&act).Error; err == nil {
+				processedBy = act.Actor.FullName
+			}
+		} else if t.Status == models.StatusHandover {
+			// Skenario 2: Tiket Handover (Cari Pengoper)
+			var act models.TicketActivity
+			// Cari aktivitas HANDOVER terakhir
+			if err := database.DB.Preload("Actor").
+				Where("ticket_id = ? AND action_type = ?", t.ID, "HANDOVER").
+				Order("created_at desc").
+				First(&act).Error; err == nil {
+				processedBy = "Handover by " + act.Actor.FullName
+			}
+		}
+		// Skenario 3: Open/In-Progress -> processedBy tetap "-"
+
+		record := []string{
+			fmt.Sprintf("#%d", t.TicketNumber),
+			t.Subject,
+			t.Category,
+			string(t.Location),
+			string(t.Status),
+			string(t.Priority),
+			t.Requester.FullName,
+			processedBy,
+			createdAt,
+			resolvedAt,
+			responseTime,
+			duration,
+			t.Solution,
+		}
+
+		if err := writer.Write(record); err != nil {
+			// Log error, but stream might be broken already
+			break 
+		}
+	}
+
+	writer.Flush()
+}
+
+// [NEW] Handler untuk Download Template Shift CSV
+func DownloadShiftTemplate(c *gin.Context) {
+	c.Header("Content-Disposition", "attachment; filename=shift_import_template.csv")
+	c.Header("Content-Type", "text/csv")
+
+	writer := csv.NewWriter(c.Writer)
+	
+	// Header Wajib
+	writer.Write([]string{"email", "label", "start_time", "end_time"})
+	
+	// Contoh Data (Agar user paham formatnya)
+	// Format Time: 2006-01-02 15:04 (Sesuai parser di ImportSchedule)
+	tomorrow := time.Now().Add(24 * time.Hour).Format("2006-01-02")
+	writer.Write([]string{"staff@example.com", "Shift Pagi", tomorrow + " 07:00", tomorrow + " 15:00"})
+	writer.Write([]string{"staff2@example.com", "Shift Siang", tomorrow + " 14:00", tomorrow + " 22:00"})
+	
+	writer.Flush()
 }
 
 func CreateShift(c *gin.Context) {

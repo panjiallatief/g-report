@@ -120,10 +120,11 @@
                         <option value="last_month" {{ if eq .period "last_month" }}selected{{ end }}>Last Month</option>
                     </select>
 
-                    <button
-                        class="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 shadow-sm">
-                        <i class="fas fa-download mr-2"></i> Report
-                    </button>
+                    <!-- TOMBOL REPORT YANG DIPERBARUI -->
+                    <a href="/manager/reports/export" target="_blank"
+                        class="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 shadow-sm flex items-center">
+                        <i class="fas fa-file-excel mr-2 text-green-600"></i> Report
+                    </a>
                     <button onclick="openModal('new-shift-modal')"
                         class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
                         <i class="fas fa-plus mr-2"></i> New Shift
@@ -426,9 +427,9 @@
                             <p class="text-xs text-slate-400 mt-1">Format: email, label, start_time, end_time</p>
                         </div>
                         <div class="text-center mt-2">
-                            <a href="/static/downloads/shift_template.csv" download
+                            <a href="/manager/shifts/template"
                                 class="inline-block text-xs text-blue-500 hover:text-blue-700 font-bold">
-                                <i class="fas fa-download mr-1"></i> Download Template
+                                <i class="fas fa-download mr-1"></i> Download Template CSV
                             </a>
                         </div>
                     </form>

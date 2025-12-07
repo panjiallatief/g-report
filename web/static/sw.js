@@ -69,8 +69,8 @@ self.addEventListener('push', function (event) {
 
   const options = {
     body: data.body,
-    icon: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
-    badge: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
+    icon: 'https://cdn-icons-png.flaticon.com/512/2115/2115955.png',
+    badge: 'https://cdn-icons-png.flaticon.com/512/2115/2115955.png',
     vibrate: [100, 50, 100],
     data: { url: data.url },
     tag: 'it-ops-notification'
