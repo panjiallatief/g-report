@@ -14,19 +14,15 @@ import (
 	"github.com/google/uuid"
 )
 
-
-// 1. History Handler (UPDATED: Menggunakan TicketActivity & Kirim urgentCount)
 func History(c *gin.Context) {
 	userIDStr, _ := c.Cookie("user_id")
-	userID, _ := uuid.Parse(userIDStr) // Parse UUID untuk query activity
+	userID, _ := uuid.Parse(userIDStr) 
 
-	// A. Hitung Urgent Count untuk Navigasi
 	var urgentCount int64
 	database.DB.Model(&models.Ticket{}).
 		Where("priority = ? AND status != ?", models.PriorityUrgentOnAir, models.StatusResolved).
 		Count(&urgentCount)
 	
-	// B. Cari ID Tiket yang DI-RESOLVE oleh User ini (Dari tabel activity)
 	var ticketIDs []uuid.UUID
 	database.DB.Model(&models.TicketActivity{}).
 		Where("actor_id = ? AND action_type = ?", userID, "RESOLVE").
@@ -34,7 +30,6 @@ func History(c *gin.Context) {
 
 	var resolvedTickets []models.Ticket
 	if len(ticketIDs) > 0 {
-		// Ambil detail tiket berdasarkan ID yang ditemukan
 		database.DB.Where("id IN ?", ticketIDs).
 			Preload("Requester").
 			Order("resolved_at desc").
@@ -44,7 +39,7 @@ func History(c *gin.Context) {
 	c.HTML(http.StatusOK, "staff/history.html", gin.H{
 		"title":       "Riwayat Pekerjaan",
 		"tickets":     resolvedTickets,
-		"urgentCount": urgentCount, // Penting untuk badge notifikasi merah di nav
+		"urgentCount": urgentCount,
 	})
 }
 
@@ -70,32 +65,26 @@ func RegisterRoutes(r *gin.Engine) {
 }
 
 func Dashboard(c *gin.Context) {
-	// 1. Get stats
 	var openTicketsCount int64
 	database.DB.Model(&models.Ticket{}).Where("status IN ?", []models.TicketStatus{models.StatusOpen, models.StatusInProgress}).Count(&openTicketsCount)
 
 	var urgentCount int64
 	database.DB.Model(&models.Ticket{}).Where("priority = ? AND status != ?", models.PriorityUrgentOnAir, models.StatusResolved).Count(&urgentCount)
 
-	// 2. Get Active Tickets (Include Handover)
+	// Fetch Active Tickets (Sama logic dengan TicketList)
 	var activeTickets []models.Ticket
-	// Show tickets assigned to current user OR unassigned OR handover tickets
-	// For simplicity in this monolithic view, show ALL Open/InProgress/Handover tickets
 	database.DB.Where("status IN ?", []models.TicketStatus{models.StatusOpen, models.StatusInProgress, models.StatusHandover}).
 		Preload("Requester").
 		Order("case when priority = 'URGENT_ON_AIR' then 1 else 2 end, created_at asc").
 		Find(&activeTickets)
 
-	// 3. Get Routine Tasks
 	var routineInstances []models.RoutineInstance
 	userIDStr, _ := c.Cookie("user_id")
 	database.DB.Preload("Template").Where("assigned_user_id = ? AND status = 'PENDING'", userIDStr).Find(&routineInstances)
 
-	// Fetch current user for Profile Picture in header
 	var user models.User
 	database.DB.First(&user, "id = ?", userIDStr)
 
-	// Prepare View Data for Routines (Parse JSON)
 	type RoutineView struct {
 		ID       uuid.UUID
 		Title    string
@@ -104,8 +93,6 @@ func Dashboard(c *gin.Context) {
 	}
 	var routineViews []RoutineView
 	
-	// ... loop ...
-
 	for _, r := range routineInstances {
 		var items map[string]bool
 		if len(r.ChecklistState) > 0 {
@@ -124,41 +111,25 @@ func Dashboard(c *gin.Context) {
 		"title":        "Staff Dashboard",
 		"ticketCount":  openTicketsCount,
 		"urgentCount":  urgentCount,
-		"tickets":      activeTickets,
+		"tickets":      activeTickets, // Kirim tiket awal agar tidak kosong saat load pertama
 		"routines":     routineViews,
 		"user":         user,
 	})
 }
 
-// NEW: HTMX Partial Handler for Ticket List Real-time Updates
+// [FIX] Menggunakan Partial Template agar tidak stack/bertumpuk
 func TicketList(c *gin.Context) {
-    // Re-use logic to fetch active tickets
 	var activeTickets []models.Ticket
 	database.DB.Where("status IN ?", []models.TicketStatus{models.StatusOpen, models.StatusInProgress, models.StatusHandover}).
 		Preload("Requester").
 		Order("case when priority = 'URGENT_ON_AIR' then 1 else 2 end, created_at asc").
 		Find(&activeTickets)
 
-    // Render partial inline
-    // In a real app we might put this in a separate file, but inline template is fine for quick fix or use same loop.
-    // Actually, we need to return just the list HTML.
-    // Since we don't have a separate template file defined for just the list, let's construct it or use a define if existed.
-    // For now, let's create a definition in dashboard.html or just iterate again.
-    // BETTER STRATEGY: Define a block in dashboard.html or use a fragment.
-    // Let's assume we will update dashboard.html to define "ticket_list" block.
-    
-    c.HTML(http.StatusOK, "staff/dashboard.html", gin.H{
+    // Render file partial yang baru dibuat
+    c.HTML(http.StatusOK, "staff/ticket_list_partial.html", gin.H{
         "tickets": activeTickets,
-        "partial": true, // custom flag if we used a block, but here we depend on template structure.
     })
-    // NOTE: This might reload full dashboard if not careful.
-    // Correct way used typically: c.HTML(200, "ticket_list", ...)
-    // But GIN requires defining the template name if loaded.
 }
-
-// ... ToggleRoutineItem ...
-
-// ... TicketDetail ...
 
 func HandoverTicket(c *gin.Context) {
 	id := c.Param("id")

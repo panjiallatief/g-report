@@ -69,35 +69,41 @@
 <body class="bg-gray-100 text-slate-800">
     {{ template "content" . }}
 
-    <!-- Notification Permission Banner (Optional UI) -->
+    <!-- Notification Permission Banner -->
     <div id="push-permission-banner"
-        class="hidden fixed bottom-0 left-0 w-full bg-blue-600 text-white p-4 z-50 shadow-lg slide-up">
+        class="hidden fixed bottom-0 left-0 w-full bg-blue-600 text-white p-4 z-[9999] shadow-[0_-5px_20px_rgba(0,0,0,0.3)] slide-up pb-8 md:pb-4">
         <div class="max-w-md mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <i class="fas fa-bell text-2xl"></i>
+                <div class="bg-white/20 p-2 rounded-full shrink-0">
+                    <i class="fas fa-bell text-xl"></i>
+                </div>
                 <div class="text-sm">
-                    <p class="font-bold">Aktifkan Notifikasi?</p>
+                    <p class="font-bold">Nyalakan Notifikasi?</p>
                     <p class="text-blue-100 text-xs">Dapatkan alert tiket urgent secara realtime.</p>
                 </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 shrink-0">
                 <button onclick="dismissPushBanner()"
-                    class="px-3 py-1.5 text-xs text-blue-200 hover:text-white">Nanti</button>
-                <button onclick="requestPushPermission()"
-                    class="px-4 py-1.5 bg-white text-blue-600 rounded-lg text-xs font-bold shadow hover:bg-blue-50">Aktifkan</button>
+                    class="px-3 py-2 text-xs text-blue-200 hover:text-white font-medium">
+                    Nanti
+                </button>
+                <button id="btn-activate-push" onclick="requestPushPermission()"
+                    class="px-4 py-2 bg-white text-blue-600 rounded-lg text-xs font-bold shadow-lg hover:bg-blue-50 transition transform active:scale-95 flex items-center justify-center min-w-[80px]">
+                    Aktifkan
+                </button>
             </div>
         </div>
     </div>
 
-    <script>
-        // --- Service Worker & Push Logic ---
+    <div id="https-warning"
+        class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-2 z-[9999] text-center text-xs font-bold">
+        ⚠️ Fitur Notifikasi memerlukan HTTPS (Ngrok) atau Localhost.
+    </div>
 
-        // Helper: Convert VAPID Key
+    <script>
         function urlBase64ToUint8Array(base64String) {
             const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding)
-                .replace(/\-/g, '+')
-                .replace(/_/g, '/');
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
             const rawData = window.atob(base64);
             const outputArray = new Uint8Array(rawData.length);
             for (let i = 0; i < rawData.length; ++i) {
@@ -106,51 +112,93 @@
             return outputArray;
         }
 
-        async function registerServiceWorker() {
-            if ('serviceWorker' in navigator) {
+        // Fungsi Register Sederhana
+        async function getOrRegisterSW() {
+            if (!('serviceWorker' in navigator)) return null;
+
+            // Cek registrasi yang sudah ada di Root scope
+            let reg = await navigator.serviceWorker.getRegistration('/');
+
+            if (!reg) {
+                // Jika belum ada, register baru
                 try {
-                    const registration = await navigator.serviceWorker.register('/static/sw.js');
-                    console.log('SW Registered:', registration.scope);
-                    return registration;
+                    reg = await navigator.serviceWorker.register('/sw.js');
+                    console.log('[SW] New registration successful:', reg.scope);
                 } catch (err) {
-                    console.error('SW Registration failed:', err);
+                    console.error('[SW] Registration failed:', err);
+                    return null;
                 }
             }
-            return null;
+            return reg;
         }
 
         async function requestPushPermission() {
-            dismissPushBanner(); // Hide UI
-
-            const registration = await navigator.serviceWorker.ready;
-            if (!registration) return;
+            const btn = document.getElementById('btn-activate-push');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
 
             try {
-                // 1. Get VAPID Public Key from Backend
-                const response = await fetch('/notifications/vapid-public-key');
+                // 1. Dapatkan SW Registration
+                const registration = await getOrRegisterSW();
+
+                if (!registration) throw new Error("Service Worker gagal dimuat.");
+
+                // 2. Ambil VAPID Key dari Backend
+                // [FIX] Tambahkan header ngrok-skip-browser-warning untuk menghindari halaman sela Ngrok
+                console.log('[Push] Mengambil VAPID Key...');
+                const response = await fetch('/notifications/vapid-public-key', {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+
+                if (!response.ok) throw new Error("Gagal mengambil kunci server (" + response.status + ")");
                 const data = await response.json();
+
+                if (!data.publicKey) throw new Error("Kunci VAPID kosong.");
                 const applicationServerKey = urlBase64ToUint8Array(data.publicKey);
 
-                // 2. Subscribe via PushManager
+                // 3. [PENTING] Hapus Subscription Lama (Clean State)
+                // Jika ada subscription lama dengan key berbeda, subscribe baru akan gagal
+                const existingSub = await registration.pushManager.getSubscription();
+                if (existingSub) {
+                    console.log('[Push] Menghapus subscription lama...');
+                    await existingSub.unsubscribe();
+                }
+
+                // 4. Subscribe Push Baru
+                console.log('[Push] Melakukan Subscription...');
                 const subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: applicationServerKey
                 });
 
-                console.log('User Subscribed:', subscription);
-
-                // 3. Send Subscription to Backend
+                // 5. Kirim ke Backend
+                console.log('[Push] Mengirim ke Backend...');
                 await fetch('/notifications/subscribe', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true'
+                    },
                     body: JSON.stringify(subscription)
                 });
 
-                alert('Notifikasi diaktifkan!');
+                document.getElementById('push-permission-banner').classList.add('hidden');
+                alert('Sukses! Notifikasi aktif.');
 
             } catch (err) {
-                console.error('Failed to subscribe:', err);
-                alert('Gagal mengaktifkan notifikasi: ' + err.message);
+                console.error('[Push] Error Detail:', err);
+
+                if (Notification.permission === 'denied') {
+                    alert('Izin diblokir browser. Mohon reset izin notifikasi (klik icon gembok di URL bar).');
+                } else if (err.message.includes('push service error')) {
+                    alert('Gagal menghubungi layanan Push Google. Pastikan internet stabil & Google Play Services aktif (jika di Emulator/HP).');
+                } else {
+                    alert('Gagal: ' + err.message);
+                }
+
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         }
 
@@ -159,42 +207,38 @@
             localStorage.setItem('push_banner_dismissed', 'true');
         }
 
-        // Init
         window.addEventListener('load', async () => {
-            const reg = await registerServiceWorker();
+            // Cek HTTPS
+            if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                document.getElementById('https-warning').classList.remove('hidden');
+                return;
+            }
 
-            // Check if user is already subscribed or dismissed
-            if (reg && 'pushManager' in reg) {
+            // Bersihkan SW lama (static) jika ada
+            navigator.serviceWorker.getRegistration('/static/sw.js').then(reg => {
+                if (reg) reg.unregister().then(() => window.location.reload());
+            });
+
+            const reg = await getOrRegisterSW();
+            if (reg) {
                 const sub = await reg.pushManager.getSubscription();
+                const isDismissed = localStorage.getItem('push_banner_dismissed') === 'true';
 
-                // [FIX] Jika subscription ada tapi VAPID key berubah di backend (Invalid State), kita perlu unsubscribe dulu
-                if (sub) {
-                    try {
-                        // Optional: Verify key match or just assume valid if exists. 
-                        // But since we just changed keys, let's force resubscribe if needed? 
-                        // For now, let's just log it.
-                        console.log('Existing subscription:', sub);
-                    } catch (e) {
-                        console.error('Subscription check failed', e);
-                    }
+                // Debug Reset via URL
+                if (new URLSearchParams(window.location.search).get('reset_push') === 'true') {
+                    if (sub) await sub.unsubscribe();
+                    localStorage.removeItem('push_banner_dismissed');
+                    await reg.unregister();
+                    alert('Reset Complete. Reloading...');
+                    window.location.href = window.location.pathname;
+                    return;
                 }
 
-                if (!sub && localStorage.getItem('push_banner_dismissed') !== 'true') {
-                    // Show banner if not subscribed
+                if (!sub && Notification.permission !== 'denied' && !isDismissed) {
                     document.getElementById('push-permission-banner').classList.remove('hidden');
                 }
             }
         });
-
-        // Debug Helper: Reset Permission State
-        window.resetPushState = async () => {
-            localStorage.removeItem('push_banner_dismissed');
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            if (sub) await sub.unsubscribe();
-            alert('Push state reset. Please reload.');
-            location.reload();
-        }
     </script>
 </body>
 

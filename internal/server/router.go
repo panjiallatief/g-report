@@ -26,13 +26,11 @@ type MultiRender struct {
 func (r MultiRender) Instance(name string, data interface{}) render.Render {
 	tmpl, ok := r.Templates[name]
 	if !ok {
-		// Fallback or panic? For now let's try to match ignoring prefix if not found
-		// Or return a error render (but Instance signature returns Render)
 		panic("Template not found: " + name)
 	}
 	return render.HTML{
 		Template: tmpl,
-		Name:     "base.html", // We always render the base, which pulls in the dynamic content
+		Name:     "base.html", 
 		Data:     data,
 	}
 }
@@ -44,10 +42,11 @@ func NewRouter() *gin.Engine {
 
 	r.Static("/static", "./web/static")
 	r.Static("/uploads", "./web/uploads")
-	// Load Templates
+    
+    // [FIX] Serve Service Worker di Root Path agar Scope-nya global (mencakup /staff, /consumer, dll)
+	r.StaticFile("/sw.js", "./web/static/sw.js")
 
 	r.NoRoute(func(c *gin.Context) {
-        // PERBAIKAN: Gunakan "pages/error/404.html" (tunggal)
 		c.HTML(http.StatusNotFound, "pages/error/404.html", gin.H{
 			"title": "Page Not Found",
 		})
@@ -101,13 +100,6 @@ func loadTemplates() MultiRender {
 		// Normalize slashes for map keys
 		name := filepath.ToSlash(rel) 
 		
-		// Parse Base + Page
-		// We clone base? usage: template.ParseFiles(base, page)
-		// Note: The First file is the "root" for Execute. 
-		// If base.html has {{ define "base.html" }}...{{ end }} it works.
-		// If base.html is just <html>...</html>, naming it via ParseFiles is tricky.
-		// Standard ParseFiles uses filename as name.
-		
 		tmpl := template.New("base.html").Funcs(template.FuncMap{
 			// Add any custom funcs here if needed
 		})
@@ -140,5 +132,3 @@ func loadTemplates() MultiRender {
 	
 	return MultiRender{Templates: templates}
 }
-
-
