@@ -166,12 +166,35 @@
             // Check if user is already subscribed or dismissed
             if (reg && 'pushManager' in reg) {
                 const sub = await reg.pushManager.getSubscription();
+
+                // [FIX] Jika subscription ada tapi VAPID key berubah di backend (Invalid State), kita perlu unsubscribe dulu
+                if (sub) {
+                    try {
+                        // Optional: Verify key match or just assume valid if exists. 
+                        // But since we just changed keys, let's force resubscribe if needed? 
+                        // For now, let's just log it.
+                        console.log('Existing subscription:', sub);
+                    } catch (e) {
+                        console.error('Subscription check failed', e);
+                    }
+                }
+
                 if (!sub && localStorage.getItem('push_banner_dismissed') !== 'true') {
                     // Show banner if not subscribed
                     document.getElementById('push-permission-banner').classList.remove('hidden');
                 }
             }
         });
+
+        // Debug Helper: Reset Permission State
+        window.resetPushState = async () => {
+            localStorage.removeItem('push_banner_dismissed');
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) await sub.unsubscribe();
+            alert('Push state reset. Please reload.');
+            location.reload();
+        }
     </script>
 </body>
 

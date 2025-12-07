@@ -7,6 +7,10 @@
         // State untuk Modal Artikel (View/Edit/New)
         modals: { new: false, view: false, edit: false },
         activeArticle: { id: '', title: '', category: '', content: '', author: '', date: '' },
+        
+        // State untuk Tooltips
+        activeTooltip: null,
+
 
         // --- Fungsi Review (Approval Queue) ---
         openReview(id, title, author, category, content, type) {
@@ -130,898 +134,961 @@
             <!-- KPI Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <!-- MTTA -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500 hover-scale cursor-default">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Response (MTTA)</p>
-                    <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-3xl font-bold text-slate-800">{{ .mtta }}m</span>
-                        <span class="text-xs text-green-500 font-bold bg-green-50 px-1.5 py-0.5 rounded"><i
-                                class="fas fa-arrow-down"></i> Live</span>
+                <div
+                    class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500 hover-scale cursor-default relative">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        Avg Response (MTTA)
+                        <i class="fas fa-info-circle text-slate-300 hover:text-blue-500 cursor-pointer transition"
+                            @mouseenter="activeTooltip = 'mtta'" @mouseleave="activeTooltip = null"></i>
+                    </p>
+                    <div x-show="activeTooltip === 'mtta'" x-transition
+                        class="absolute z-50 top-full left-0 mt-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl pointer-events-none">
+                        Rata-rata waktu dari tiket dibuat hingga respon pertama. <br><br>Target: <br>• Urgent < 2m <br>•
+                            High < 10m </div>
+                                <div class="mt-2 flex items-baseline gap-2">
+                                    <span class="text-3xl font-bold text-slate-800">{{ .mtta }}m</span>
+                                    <span class="text-xs text-green-500 font-bold bg-green-50 px-1.5 py-0.5 rounded"><i
+                                            class="fas fa-arrow-down"></i> Live</span>
+                                </div>
                     </div>
-                </div>
-                <!-- MTTR -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500 hover-scale cursor-default">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg Resolution (MTTR)</p>
-                    <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-3xl font-bold text-slate-800">{{ .mttr }}m</span>
-                        <span class="text-xs text-slate-400 font-bold bg-slate-50 px-1.5 py-0.5 rounded">All Time</span>
-                    </div>
-                </div>
-                <!-- FCR -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-green-500">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">First Contact Res.</p>
-                    <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-3xl font-bold text-slate-800">{{ .fcr }}%</span>
-                        <span class="text-xs text-slate-400">Target: 80%</span>
-                    </div>
-                </div>
-                <!-- Big Book -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-orange-500">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Big Book Articles</p>
-                    <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-3xl font-bold text-slate-800">{{ .articleCount }}</span>
-                        {{ if gt .newArticlesCount 0 }}
-                        <span class="text-xs text-blue-500 font-bold bg-blue-50 px-1.5 py-0.5 rounded">+{{
-                            .newArticlesCount }} Pending</span>
-                        {{ end }}
-                    </div>
-                </div>
-
-
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fas fa-chart-line text-blue-500"></i> Weekly Ticket Trend
-                    </h3>
-                    <div class="flex gap-2">
-                        <span class="text-xs flex items-center gap-1"><span
-                                class="w-3 h-3 bg-blue-500 rounded-full"></span> Incoming</span>
-                        <span class="text-xs flex items-center gap-1"><span
-                                class="w-3 h-3 bg-green-500 rounded-full"></span> Resolved</span>
-                    </div>
-                </div>
-                <div class="h-64 w-full">
-                    <canvas id="kpiChart"></canvas>
-                </div>
-            </div>
-
-            <!-- SLA Compliance Section -->
-            <div class="grid grid-cols-1 mb-8" style="animation-delay: 100ms;">
-                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i
-                        class="fas fa-clipboard-check text-blue-500"></i> SLA Compliance Report</h3>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-xs">
-                            <tr>
-                                <th class="p-4">Category</th>
-                                <th class="p-4">Target (Res)</th>
-                                <th class="p-4 text-center">Total Tickets</th>
-                                <th class="p-4 text-center">Compliant</th>
-                                <th class="p-4 text-center">Rate</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            {{ range .slaMetrics }}
-                            <tr class="hover:bg-slate-50 transition">
-                                <td class="p-4 font-bold text-slate-700">
-                                    {{ if eq .Priority "URGENT_ON_AIR" }}
-                                    <span class="text-red-600"><i class="fas fa-broadcast-tower mr-2 w-4"></i>Urgent
-                                        (On Air)</span>
-                                    {{ else }}
-                                    <span class="text-blue-600"><i class="fas fa-briefcase mr-2 w-4"></i>Normal /
-                                        High</span>
-                                    {{ end }}
-                                </td>
-                                <td class="p-4 text-slate-500 text-xs">
-                                    {{ if eq .Priority "URGENT_ON_AIR" }} < 15 Mins {{ else }} < 8 Hours {{ end }} </td>
-                                <td class="p-4 text-center text-slate-800 font-bold">{{ .TotalTickets }}</td>
-                                <td class="p-4 text-center text-green-600 font-bold">{{ .CompliantTickets }}</td>
-                                <td class="p-4 text-center">
-                                    <div class="flex items-center justify-center gap-2">
+                    <!-- MTTR -->
+                    <div
+                        class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-purple-500 hover-scale cursor-default relative">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            Avg Resolution (MTTR)
+                            <i class="fas fa-info-circle text-slate-300 hover:text-purple-500 cursor-pointer transition"
+                                @mouseenter="activeTooltip = 'mttr'" @mouseleave="activeTooltip = null"></i>
+                        </p>
+                        <div x-show="activeTooltip === 'mttr'" x-transition
+                            class="absolute z-50 top-full left-0 mt-2 w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl pointer-events-none">
+                            Rata-rata waktu dari tiket dibuat hingga resolved. <br><br>Target: <br>• Urgent < 15m <br>•
+                                High < 1h </div>
+                                    <div class="mt-2 flex items-baseline gap-2">
+                                        <span class="text-3xl font-bold text-slate-800">{{ .mttr }}m</span>
                                         <span
-                                            class="font-bold {{ if ge .ComplianceRate 90.0 }}text-green-600{{ else if ge .ComplianceRate 75.0 }}text-yellow-600{{ else }}text-red-600{{ end }}">
-                                            {{ printf "%.1f" .ComplianceRate }}%
-                                        </span>
-                                        <!-- Progress Bar -->
-                                        <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="h-full {{ if ge .ComplianceRate 90.0 }}bg-green-500{{ else if ge .ComplianceRate 75.0 }}bg-yellow-500{{ else }}bg-red-500{{ end }}"
-                                                style="width: {{ .ComplianceRate }} %"></div>
+                                            class="text-xs text-slate-400 font-bold bg-slate-50 px-1.5 py-0.5 rounded">All
+                                            Time</span>
+                                    </div>
+                        </div>
+                        <!-- FCR -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-green-500">
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">First Contact Res.</p>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span class="text-3xl font-bold text-slate-800">{{ .fcr }}%</span>
+                                <span class="text-xs text-slate-400">Target: 80%</span>
+                            </div>
+                        </div>
+                        <!-- Big Book -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-orange-500">
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Big Book Articles</p>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span class="text-3xl font-bold text-slate-800">{{ .articleCount }}</span>
+                                {{ if gt .newArticlesCount 0 }}
+                                <span class="text-xs text-blue-500 font-bold bg-blue-50 px-1.5 py-0.5 rounded">+{{
+                                    .newArticlesCount }} Pending</span>
+                                {{ end }}
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-chart-line text-blue-500"></i> Weekly Ticket Trend
+                            </h3>
+                            <div class="flex gap-2">
+                                <span class="text-xs flex items-center gap-1"><span
+                                        class="w-3 h-3 bg-blue-500 rounded-full"></span> Incoming</span>
+                                <span class="text-xs flex items-center gap-1"><span
+                                        class="w-3 h-3 bg-green-500 rounded-full"></span> Resolved</span>
+                            </div>
+                        </div>
+                        <div class="h-64 w-full">
+                            <canvas id="kpiChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- SLA Compliance Section -->
+                    <div class="grid grid-cols-1 mb-8" style="animation-delay: 100ms;">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 relative">
+                            <i class="fas fa-clipboard-check text-blue-500"></i>
+                            SLA Compliance Report
+                            <i class="fas fa-info-circle text-slate-300 text-sm hover:text-blue-500 cursor-pointer transition"
+                                @mouseenter="activeTooltip = 'sla'" @mouseleave="activeTooltip = null"></i>
+
+                            <div x-show="activeTooltip === 'sla'" x-transition
+                                class="absolute z-50 top-full left-0 mt-2 w-72 p-3 bg-slate-800 text-white text-xs font-normal rounded-lg shadow-xl pointer-events-none">
+                                Tingkat kepatuhan tiket terhadap target waktu respon dan penyelesaian berdasarkan
+                                prioritas.
+                            </div>
+                        </h3>
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead
+                                    class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-xs">
+                                    <tr>
+                                        <th class="p-4">Category</th>
+                                        <th class="p-4">Target (Res)</th>
+                                        <th class="p-4 text-center">Total Tickets</th>
+                                        <th class="p-4 text-center">Compliant</th>
+                                        <th class="p-4 text-center">Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    {{ range .slaMetrics }}
+                                    <tr class="hover:bg-slate-50 transition">
+                                        <td class="p-4 font-bold text-slate-700">
+                                            {{ if eq .Priority "URGENT_ON_AIR" }}
+                                            <span class="text-red-600"><i
+                                                    class="fas fa-broadcast-tower mr-2 w-4"></i>Urgent
+                                                (On Air)</span>
+                                            {{ else }}
+                                            <span class="text-blue-600"><i class="fas fa-briefcase mr-2 w-4"></i>Normal
+                                                /
+                                                High</span>
+                                            {{ end }}
+                                        </td>
+                                        <td class="p-4 text-slate-500 text-xs">
+                                            {{ if eq .Priority "URGENT_ON_AIR" }} < 15 Mins {{ else }} < 8 Hours {{ end
+                                                }} </td>
+                                        <td class="p-4 text-center text-slate-800 font-bold">{{ .TotalTickets }}</td>
+                                        <td class="p-4 text-center text-green-600 font-bold">{{ .CompliantTickets }}
+                                        </td>
+                                        <td class="p-4 text-center">
+                                            <div class="flex items-center justify-center gap-2">
+                                                <span
+                                                    class="font-bold {{ if ge .ComplianceRate 90.0 }}text-green-600{{ else if ge .ComplianceRate 75.0 }}text-yellow-600{{ else }}text-red-600{{ end }}">
+                                                    {{ printf "%.1f" .ComplianceRate }}%
+                                                </span>
+                                                <!-- Progress Bar -->
+                                                <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div class="h-full {{ if ge .ComplianceRate 90.0 }}bg-green-500{{ else if ge .ComplianceRate 75.0 }}bg-yellow-500{{ else }}bg-red-500{{ end }}"
+                                                        style="width: {{ .ComplianceRate }} %"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{ else }}
+                                    <tr>
+                                        <td colspan="5" class="p-6 text-center text-slate-400 italic">No tickets to
+                                            analyze
+                                            yet.</td>
+                                    </tr>
+                                    {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+
+
+                    <!-- Quick Overview Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <h3 class="font-bold text-slate-800">Active Shift</h3>
+                                {{ if .hasActiveShift }}
+                                <span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">{{
+                                    .activeShift.Label }} ({{ .activeShift.StartTime.Format "15:04" }} - {{
+                                    .activeShift.EndTime.Format "15:04" }})</span>
+                                {{ else }}
+                                <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">No Active
+                                    Shift</span>
+                                {{ end }}
+                            </div>
+                            <div class="p-6">
+                                {{ if .hasActiveShift }}
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="relative">
+                                            <img src="{{ if .activeShift.User.AvatarURL }}{{ .activeShift.User.AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .activeShift.User.FullName }}&background=random{{ end }}"
+                                                class="w-10 h-10 rounded-full">
+                                            <div
+                                                class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-slate-800">{{ .activeShift.User.FullName }}
+                                            </p>
+                                            <p class="text-xs text-slate-500">Currently On Duty</p>
                                         </div>
                                     </div>
-                                </td>
-                            </tr>
-                            {{ else }}
-                            <tr>
-                                <td colspan="5" class="p-6 text-center text-slate-400 italic">No tickets to analyze
-                                    yet.</td>
-                            </tr>
-                            {{ end }}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-
-
-            <!-- Quick Overview Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <h3 class="font-bold text-slate-800">Active Shift</h3>
-                        {{ if .hasActiveShift }}
-                        <span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">{{
-                            .activeShift.Label }} ({{ .activeShift.StartTime.Format "15:04" }} - {{
-                            .activeShift.EndTime.Format "15:04" }})</span>
-                        {{ else }}
-                        <span class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded">No Active
-                            Shift</span>
-                        {{ end }}
-                    </div>
-                    <div class="p-6">
-                        {{ if .hasActiveShift }}
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-3">
-                                <div class="relative">
-                                    <img src="{{ if .activeShift.User.AvatarURL }}{{ .activeShift.User.AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .activeShift.User.FullName }}&background=random{{ end }}"
-                                        class="w-10 h-10 rounded-full">
-                                    <div
-                                        class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full">
-                                    </div>
+                                    <button
+                                        class="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50">Detail</button>
                                 </div>
-                                <div>
-                                    <p class="text-sm font-bold text-slate-800">{{ .activeShift.User.FullName }}</p>
-                                    <p class="text-xs text-slate-500">Currently On Duty</p>
+                                {{ else }}
+                                <div class="text-center py-4 text-slate-400 text-sm">
+                                    <p>Tidak ada staff yang sedang shift saat ini.</p>
                                 </div>
+                                {{ end }}
+                                <button onclick="switchManagerTab('shifts')"
+                                    class="w-full text-center text-sm text-blue-600 font-bold py-2 hover:bg-blue-50 rounded-lg transition">Lihat
+                                    Jadwal Lengkap</button>
                             </div>
-                            <button
-                                class="text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50">Detail</button>
                         </div>
-                        {{ else }}
-                        <div class="text-center py-4 text-slate-400 text-sm">
-                            <p>Tidak ada staff yang sedang shift saat ini.</p>
+
+                        <!-- PENDING APPROVAL CARD (Updated to Table with Modal Trigger) -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <h3 class="font-bold text-slate-800">Review Queue</h3>
+                                <span class="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded">{{
+                                    .newArticlesCount }} Items</span>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <tbody class="divide-y divide-slate-100">
+                                        <!-- 1. Candidates from Tickets (Prioritas) -->
+                                        {{ range .candidateTickets }}
+                                        <tr class="hover:bg-indigo-50 transition cursor-pointer group"
+                                            @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket #{{ .TicketNumber }})', '{{ .Category }}', '{{ .Solution }}', 'ticket')">
+                                            <td class="px-6 py-4">
+                                                <span class="block text-xs text-indigo-600 font-bold mb-1">FROM TICKET
+                                                    #{{
+                                                    .TicketNumber }}</span>
+                                                <span class="font-bold text-slate-700 group-hover:text-indigo-700">{{
+                                                    .Subject
+                                                    }}</span>
+                                            </td>
+                                            <td class="px-6 py-4 text-right">
+                                                <!-- Tombol View/Review (Gunakan button, bukan span) -->
+                                                <button type="button"
+                                                    class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold group-hover:bg-indigo-600 group-hover:text-white transition">Review</button>
+                                            </td>
+                                        </tr>
+                                        {{ end }}
+
+                                        <!-- 2. Manual Drafts -->
+                                        {{ range .pendingArticles }}
+                                        <tr class="hover:bg-slate-50 transition cursor-pointer group"
+                                            @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')">
+                                            <td class="px-6 py-4">
+                                                <span class="block text-xs text-slate-400 mb-1">DRAFT BY {{
+                                                    .Author.FullName
+                                                    }}</span>
+                                                <span class="font-bold text-slate-700">{{ .Title }}</span>
+                                            </td>
+                                            <td class="px-6 py-4 text-right">
+                                                <!-- Tombol View/Review (Gunakan button, bukan span) -->
+                                                <button type="button"
+                                                    class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold group-hover:bg-slate-600 group-hover:text-white transition">Review</button>
+                                            </td>
+                                        </tr>
+                                        {{ end }}
+
+                                        {{ if and (not .candidateTickets) (not .pendingArticles) }}
+                                        <tr>
+                                            <td colspan="2" class="p-8 text-center text-slate-400 italic">
+                                                <i class="fas fa-check-circle text-2xl mb-2 text-green-400"></i>
+                                                <p>All clear! Nothing to review.</p>
+                                            </td>
+                                        </tr>
+                                        {{ end }}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Quick Link to Big Book Tab -->
+                            <div class="p-3 bg-slate-50 border-t border-slate-100 text-center">
+                                <button class="text-xs font-bold text-slate-500 hover:text-slate-800"
+                                    onclick="switchManagerTab('bigbook')">Manage All Articles</button>
+                            </div>
                         </div>
-                        {{ end }}
-                        <button onclick="switchManagerTab('shifts')"
-                            class="w-full text-center text-sm text-blue-600 font-bold py-2 hover:bg-blue-50 rounded-lg transition">Lihat
-                            Jadwal Lengkap</button>
                     </div>
                 </div>
 
-                <!-- PENDING APPROVAL CARD (Updated to Table with Modal Trigger) -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                        <h3 class="font-bold text-slate-800">Review Queue</h3>
-                        <span class="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded">{{
-                            .newArticlesCount }} Items</span>
+
+                <!-- 3.2 SHIFT MANAGEMENT VIEW (UNCHANGED) -->
+                <div id="manager-content-shifts" class="hidden fade-in">
+                    <!-- ... existing content ... -->
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Shift Management</h2>
+                            <p class="text-slate-500 text-sm">Atur jadwal teknisi mingguan</p>
+                        </div>
+                        <button onclick="openModal('new-shift-modal')"
+                            class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
+                            <i class="fas fa-plus mr-2"></i> Add Shift
+                        </button>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <!-- CSV Import -->
+                    <form action="/manager/shifts/import" method="POST" enctype="multipart/form-data" class="mb-6">
+                        <div onclick="document.getElementById('scheduleInfo').click()"
+                            class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 mb-6 hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer group relative">
+                            <input type="file" name="schedule" id="scheduleInfo" class="hidden" accept=".csv"
+                                onchange="this.form.submit()">
+
+                            <i
+                                class="fas fa-file-csv text-4xl text-slate-300 mb-3 group-hover:text-blue-500 transition"></i>
+                            <p class="text-sm font-bold text-slate-600">Click to Upload Schedule CSV</p>
+                            <p class="text-xs text-slate-400 mt-1">Format: email, label, start_time, end_time</p>
+                        </div>
+                        <div class="text-center mt-2">
+                            <a href="/static/downloads/shift_template.csv" download
+                                class="inline-block text-xs text-blue-500 hover:text-blue-700 font-bold">
+                                <i class="fas fa-download mr-1"></i> Download Template
+                            </a>
+                        </div>
+                    </form>
+
+                    <!-- Schedule Table -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <table class="w-full text-sm text-left">
-                            <tbody class="divide-y divide-slate-100">
-                                <!-- 1. Candidates from Tickets (Prioritas) -->
-                                {{ range .candidateTickets }}
-                                <tr class="hover:bg-indigo-50 transition cursor-pointer group"
-                                    @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket #{{ .TicketNumber }})', '{{ .Category }}', '{{ .Solution }}', 'ticket')">
-                                    <td class="px-6 py-4">
-                                        <span class="block text-xs text-indigo-600 font-bold mb-1">FROM TICKET #{{
-                                            .TicketNumber }}</span>
-                                        <span class="font-bold text-slate-700 group-hover:text-indigo-700">{{ .Subject
-                                            }}</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <!-- Tombol View/Review (Gunakan button, bukan span) -->
-                                        <button type="button"
-                                            class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold group-hover:bg-indigo-600 group-hover:text-white transition">Review</button>
-                                    </td>
-                                </tr>
-                                {{ end }}
-
-                                <!-- 2. Manual Drafts -->
-                                {{ range .pendingArticles }}
-                                <tr class="hover:bg-slate-50 transition cursor-pointer group"
-                                    @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')">
-                                    <td class="px-6 py-4">
-                                        <span class="block text-xs text-slate-400 mb-1">DRAFT BY {{ .Author.FullName
-                                            }}</span>
-                                        <span class="font-bold text-slate-700">{{ .Title }}</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <!-- Tombol View/Review (Gunakan button, bukan span) -->
-                                        <button type="button"
-                                            class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold group-hover:bg-slate-600 group-hover:text-white transition">Review</button>
-                                    </td>
-                                </tr>
-                                {{ end }}
-
-                                {{ if and (not .candidateTickets) (not .pendingArticles) }}
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                    <td colspan="2" class="p-8 text-center text-slate-400 italic">
-                                        <i class="fas fa-check-circle text-2xl mb-2 text-green-400"></i>
-                                        <p>All clear! Nothing to review.</p>
+                                    <th class="px-6 py-4">Day / Date</th>
+                                    <th class="px-6 py-4">Time</th>
+                                    <th class="px-6 py-4">Staff</th>
+                                    <th class="px-6 py-4">Shift Name</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {{ range .upcomingShifts }}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-6 py-4 font-medium text-blue-700">{{ .DateStr }}</td>
+                                    <td class="px-6 py-4 text-slate-600">{{ .TimeStr }}</td>
+                                    <td class="px-6 py-4 font-medium flex items-center gap-2">
+                                        <img src="{{ if .AvatarURL }}{{ .AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .StaffName }}&background=random{{ end }}"
+                                            class="w-6 h-6 rounded-full object-cover">
+                                        {{ .StaffName }}
+                                    </td>
+                                    <td class="px-6 py-4"><span
+                                            class="{{ .StatusClass }} px-2 py-1 rounded text-xs font-bold">{{ .Label
+                                            }}</span>
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-slate-400">Belum ada jadwal minggu
+                                        ini.
                                     </td>
                                 </tr>
                                 {{ end }}
                             </tbody>
                         </table>
                     </div>
-                    <!-- Quick Link to Big Book Tab -->
-                    <div class="p-3 bg-slate-50 border-t border-slate-100 text-center">
-                        <button class="text-xs font-bold text-slate-500 hover:text-slate-800"
-                            onclick="switchManagerTab('bigbook')">Manage All Articles</button>
+                </div>
+
+                <!-- 3.3 BIG BOOK WIKI VIEW (UPDATED) -->
+                <div id="manager-content-bigbook" class="hidden fade-in">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Big Book Wiki</h2>
+                            <p class="text-slate-500 text-sm">Knowledge Base & Approval System</p>
+                        </div>
+                        <!-- TOMBOL NEW ARTICLE (Memanggil openNewModal) -->
+                        <button @click="openNewModal()"
+                            class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200 transition transform active:scale-95">
+                            <i class="fas fa-plus mr-2"></i> New Article
+                        </button>
+                    </div>
+
+                    <!-- REUSED: Review Queue (Gabungan Ticket Candidates & Pending Articles) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                        <div class="p-4 border-b border-slate-100 bg-orange-50 flex items-center gap-2">
+                            <i class="fas fa-clock text-orange-500"></i>
+                            <h3 class="font-bold text-orange-800 text-sm">Review Queue</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-6 py-3">Type</th>
+                                        <th class="px-6 py-3">Title</th>
+                                        <th class="px-6 py-3">Author/Source</th>
+                                        <th class="px-6 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <!-- 1. Candidates from Tickets -->
+                                    {{ range .candidateTickets }}
+                                    <tr class="hover:bg-indigo-50 transition cursor-pointer group">
+                                        <td class="px-6 py-4"><span
+                                                class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">TICKET</span>
+                                        </td>
+                                        <td class="px-6 py-4 font-bold text-slate-700">{{ .Subject }}</td>
+                                        <td class="px-6 py-4 text-slate-500">Ticket #{{ .TicketNumber }}</td>
+                                        <td class="px-6 py-4 text-right">
+                                            <!-- TOMBOL REVIEW TIKET -->
+                                            <button type="button"
+                                                @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket)', '{{ .Category }}', '{{ .Solution }}', 'ticket')"
+                                                class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold hover:bg-indigo-600 hover:text-white transition shadow-sm">
+                                                Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {{ end }}
+
+                                    <!-- 2. Pending Drafts -->
+                                    {{ range .pendingArticles }}
+                                    <tr class="hover:bg-slate-50 transition cursor-pointer group">
+                                        <td class="px-6 py-4"><span
+                                                class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">DRAFT</span>
+                                        </td>
+                                        <td class="px-6 py-4 font-bold text-slate-700">{{ .Title }}</td>
+                                        <td class="px-6 py-4 text-slate-500">{{ .Author.FullName }}</td>
+                                        <td class="px-6 py-4 text-right">
+                                            <!-- TOMBOL REVIEW ARTIKEL -->
+                                            <button type="button"
+                                                @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')"
+                                                class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold hover:bg-slate-600 hover:text-white transition shadow-sm">
+                                                Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {{ end }}
+
+                                    {{ if and (not .candidateTickets) (not .pendingArticles) }}
+                                    <tr>
+                                        <td colspan="4" class="p-6 text-center text-slate-400 italic">Nothing to review.
+                                        </td>
+                                    </tr>
+                                    {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Published List (UPDATED: Added View & Edit Buttons) -->
+                    <h3 class="font-bold text-slate-700 mb-4">Published Articles</h3>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-3">Title</th>
+                                    <th class="px-6 py-3">Category</th>
+                                    <th class="px-6 py-3">Views</th>
+                                    <th class="px-6 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {{ range .publishedArticles }}
+                                <tr class="group hover:bg-slate-50 transition">
+                                    <!-- Klik Judul -> View Detail -->
+                                    <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer"
+                                        @click="fetchAndOpen('view', '{{ .ID }}')">
+                                        {{ .Title }}
+                                    </td>
+                                    <td class="px-6 py-3"><span
+                                            class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">{{
+                                            .Category }}</span></td>
+                                    <td class="px-6 py-3">{{ .ViewsCount }}</td>
+                                    <td class="px-6 py-3 text-right flex justify-end gap-2">
+                                        <!-- Tombol Edit -->
+                                        <button type="button" @click="fetchAndOpen('edit', '{{ .ID }}')"
+                                            class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center transition shadow-sm"
+                                            title="Edit Article">
+                                            <i class="fas fa-pen text-xs"></i>
+                                        </button>
+                                        <!-- Tombol Delete -->
+                                        <form action="/manager/articles/{{ .ID }}/delete" method="POST"
+                                            onsubmit="return confirm('Hapus artikel ini permanen?')" class="inline">
+                                            <button type="submit"
+                                                class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shadow-sm"
+                                                title="Delete Article">
+                                                <i class="fas fa-trash text-xs"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-slate-400">Belum ada artikel
+                                        dipublish.
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
+                <!-- 3.4 STAFF PERFORMANCE VIEW -->
+                <div id="manager-content-performance" class="hidden fade-in">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Staff Performance</h2>
+                            <p class="text-slate-500 text-sm">Evaluasi KPI Tim IT Support</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <select class="bg-white border border-slate-300 px-3 py-2 rounded-lg text-sm">
+                                <option>This Month</option>
+                                <option>Last Month</option>
+                            </select>
+                        </div>
+                    </div>
 
-        <!-- 3.2 SHIFT MANAGEMENT VIEW (UNCHANGED) -->
-        <div id="manager-content-shifts" class="hidden fade-in">
-            <!-- ... existing content ... -->
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Shift Management</h2>
-                    <p class="text-slate-500 text-sm">Atur jadwal teknisi mingguan</p>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-4">Staff Name</th>
+                                    <th class="px-6 py-4 text-center">Tickets Solved</th>
+                                    <th class="px-6 py-4 text-center">Avg Response (MTTA)</th>
+                                    <th class="px-6 py-4 text-center">Avg Resolution (MTTR)</th>
+                                    <th class="px-6 py-4 text-center">Big Book Contrib</th>
+                                    <th class="px-6 py-4 text-center">Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {{ range .staffPerformance }}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-6 py-4 font-medium flex items-center gap-3">
+                                        <img src="{{ if .AvatarURL }}{{ .AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .StaffName }}&background=random{{ end }}"
+                                            class="w-8 h-8 rounded-full">
+                                        <div>
+                                            <p class="text-sm font-bold text-slate-800">{{ .StaffName }}</p>
+                                            <p class="text-xs text-slate-500">{{ .Role }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-center font-bold text-blue-600">{{ .TicketsSolved }}</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">{{ .MTTA }}</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">{{ .MTTR }}</td>
+                                    <td class="px-6 py-4 text-center font-bold text-green-600">{{ .BigBookContrib }}
+                                    </td>
+                                    <td class="px-6 py-4 text-center flex justify-center text-yellow-500">
+                                        <i class="fas fa-star"></i> {{ .Rating }}
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center text-slate-400">Belum ada data
+                                        performance.
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <button onclick="openModal('new-shift-modal')"
-                    class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
-                    <i class="fas fa-plus mr-2"></i> Add Shift
-                </button>
-            </div>
 
-            <!-- CSV Import -->
-            <form action="/manager/shifts/import" method="POST" enctype="multipart/form-data" class="mb-6">
-                <div onclick="document.getElementById('scheduleInfo').click()"
-                    class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 mb-6 hover:bg-blue-50 hover:border-blue-400 transition cursor-pointer group relative">
-                    <input type="file" name="schedule" id="scheduleInfo" class="hidden" accept=".csv"
-                        onchange="this.form.submit()">
+                <!-- 3.5 ROUTINES CONTENT (New Tab) -->
+                <!-- 3.5 ROUTINES CONTENT (Updated: Delete Button) -->
+                <div id="manager-content-routines" class="hidden fade-in slide-up">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Routine Management</h2>
+                            <p class="text-slate-500 text-sm">Manage recurring tasks and checklists.</p>
+                        </div>
+                        <button onclick="openModal('new-routine-modal')"
+                            class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
+                            <i class="fas fa-plus mr-2"></i> New Routine
+                        </button>
+                    </div>
 
-                    <i class="fas fa-file-csv text-4xl text-slate-300 mb-3 group-hover:text-blue-500 transition"></i>
-                    <p class="text-sm font-bold text-slate-600">Click to Upload Schedule CSV</p>
-                    <p class="text-xs text-slate-400 mt-1">Format: email, label, start_time, end_time</p>
-                </div>
-                <div class="text-center mt-2">
-                    <a href="/static/downloads/shift_template.csv" download
-                        class="inline-block text-xs text-blue-500 hover:text-blue-700 font-bold">
-                        <i class="fas fa-download mr-1"></i> Download Template
-                    </a>
-                </div>
-            </form>
-
-            <!-- Schedule Table -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table class="w-full text-sm text-left">
-                    <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-4">Day / Date</th>
-                            <th class="px-6 py-4">Time</th>
-                            <th class="px-6 py-4">Staff</th>
-                            <th class="px-6 py-4">Shift Name</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {{ range .upcomingShifts }}
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="px-6 py-4 font-medium text-blue-700">{{ .DateStr }}</td>
-                            <td class="px-6 py-4 text-slate-600">{{ .TimeStr }}</td>
-                            <td class="px-6 py-4 font-medium flex items-center gap-2">
-                                <img src="{{ if .AvatarURL }}{{ .AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .StaffName }}&background=random{{ end }}"
-                                    class="w-6 h-6 rounded-full object-cover">
-                                {{ .StaffName }}
-                            </td>
-                            <td class="px-6 py-4"><span
-                                    class="{{ .StatusClass }} px-2 py-1 rounded text-xs font-bold">{{ .Label
-                                    }}</span>
-                            </td>
-                        </tr>
-                        {{ else }}
-                        <tr>
-                            <td colspan="4" class="px-6 py-8 text-center text-slate-400">Belum ada jadwal minggu ini.
-                            </td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- 3.3 BIG BOOK WIKI VIEW (UPDATED) -->
-        <div id="manager-content-bigbook" class="hidden fade-in">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Big Book Wiki</h2>
-                    <p class="text-slate-500 text-sm">Knowledge Base & Approval System</p>
-                </div>
-                <!-- TOMBOL NEW ARTICLE (Memanggil openNewModal) -->
-                <button @click="openNewModal()"
-                    class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200 transition transform active:scale-95">
-                    <i class="fas fa-plus mr-2"></i> New Article
-                </button>
-            </div>
-
-            <!-- REUSED: Review Queue (Gabungan Ticket Candidates & Pending Articles) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                <div class="p-4 border-b border-slate-100 bg-orange-50 flex items-center gap-2">
-                    <i class="fas fa-clock text-orange-500"></i>
-                    <h3 class="font-bold text-orange-800 text-sm">Review Queue</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
-                            <tr>
-                                <th class="px-6 py-3">Type</th>
-                                <th class="px-6 py-3">Title</th>
-                                <th class="px-6 py-3">Author/Source</th>
-                                <th class="px-6 py-3 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <!-- 1. Candidates from Tickets -->
-                            {{ range .candidateTickets }}
-                            <tr class="hover:bg-indigo-50 transition cursor-pointer group">
-                                <td class="px-6 py-4"><span
-                                        class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">TICKET</span>
-                                </td>
-                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Subject }}</td>
-                                <td class="px-6 py-4 text-slate-500">Ticket #{{ .TicketNumber }}</td>
-                                <td class="px-6 py-4 text-right">
-                                    <!-- TOMBOL REVIEW TIKET -->
-                                    <button type="button"
-                                        @click="openReview('{{ .ID }}', '{{ .Subject }}', 'System (Ticket)', '{{ .Category }}', '{{ .Solution }}', 'ticket')"
-                                        class="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold hover:bg-indigo-600 hover:text-white transition shadow-sm">
-                                        Review
-                                    </button>
-                                </td>
-                            </tr>
-                            {{ end }}
-
-                            <!-- 2. Pending Drafts -->
-                            {{ range .pendingArticles }}
-                            <tr class="hover:bg-slate-50 transition cursor-pointer group">
-                                <td class="px-6 py-4"><span
-                                        class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">DRAFT</span>
-                                </td>
-                                <td class="px-6 py-4 font-bold text-slate-700">{{ .Title }}</td>
-                                <td class="px-6 py-4 text-slate-500">{{ .Author.FullName }}</td>
-                                <td class="px-6 py-4 text-right">
-                                    <!-- TOMBOL REVIEW ARTIKEL -->
-                                    <button type="button"
-                                        @click="openReview('{{ .ID }}', '{{ .Title }}', '{{ .Author.FullName }}', '{{ .Category }}', '{{ .Content }}', 'article')"
-                                        class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1 rounded-full font-bold hover:bg-slate-600 hover:text-white transition shadow-sm">
-                                        Review
-                                    </button>
-                                </td>
-                            </tr>
-                            {{ end }}
-
-                            {{ if and (not .candidateTickets) (not .pendingArticles) }}
-                            <tr>
-                                <td colspan="4" class="p-6 text-center text-slate-400 italic">Nothing to review.</td>
-                            </tr>
-                            {{ end }}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Published List (UPDATED: Added View & Edit Buttons) -->
-            <h3 class="font-bold text-slate-700 mb-4">Published Articles</h3>
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-3">Title</th>
-                            <th class="px-6 py-3">Category</th>
-                            <th class="px-6 py-3">Views</th>
-                            <th class="px-6 py-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {{ range .publishedArticles }}
-                        <tr class="group hover:bg-slate-50 transition">
-                            <!-- Klik Judul -> View Detail -->
-                            <td class="px-6 py-3 font-medium text-blue-600 hover:underline cursor-pointer"
-                                @click="fetchAndOpen('view', '{{ .ID }}')">
-                                {{ .Title }}
-                            </td>
-                            <td class="px-6 py-3"><span
-                                    class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">{{
-                                    .Category }}</span></td>
-                            <td class="px-6 py-3">{{ .ViewsCount }}</td>
-                            <td class="px-6 py-3 text-right flex justify-end gap-2">
-                                <!-- Tombol Edit -->
-                                <button type="button" @click="fetchAndOpen('edit', '{{ .ID }}')"
-                                    class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center transition shadow-sm"
-                                    title="Edit Article">
-                                    <i class="fas fa-pen text-xs"></i>
-                                </button>
-                                <!-- Tombol Delete -->
-                                <form action="/manager/articles/{{ .ID }}/delete" method="POST"
-                                    onsubmit="return confirm('Hapus artikel ini permanen?')" class="inline">
-                                    <button type="submit"
-                                        class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 flex items-center justify-center transition shadow-sm"
-                                        title="Delete Article">
-                                        <i class="fas fa-trash text-xs"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {{ else }}
-                        <tr>
-                            <td colspan="4" class="px-6 py-4 text-center text-slate-400">Belum ada artikel dipublish.
-                            </td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- 3.4 STAFF PERFORMANCE VIEW -->
-        <div id="manager-content-performance" class="hidden fade-in">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Staff Performance</h2>
-                    <p class="text-slate-500 text-sm">Evaluasi KPI Tim IT Support</p>
-                </div>
-                <div class="flex gap-2">
-                    <select class="bg-white border border-slate-300 px-3 py-2 rounded-lg text-sm">
-                        <option>This Month</option>
-                        <option>Last Month</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-4">Staff Name</th>
-                            <th class="px-6 py-4 text-center">Tickets Solved</th>
-                            <th class="px-6 py-4 text-center">Avg Response (MTTA)</th>
-                            <th class="px-6 py-4 text-center">Avg Resolution (MTTR)</th>
-                            <th class="px-6 py-4 text-center">Big Book Contrib</th>
-                            <th class="px-6 py-4 text-center">Rating</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {{ range .staffPerformance }}
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="px-6 py-4 font-medium flex items-center gap-3">
-                                <img src="{{ if .AvatarURL }}{{ .AvatarURL }}{{ else }}https://ui-avatars.com/api/?name={{ .StaffName }}&background=random{{ end }}"
-                                    class="w-8 h-8 rounded-full">
-                                <div>
-                                    <p class="text-sm font-bold text-slate-800">{{ .StaffName }}</p>
-                                    <p class="text-xs text-slate-500">{{ .Role }}</p>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 text-center font-bold text-blue-600">{{ .TicketsSolved }}</td>
-                            <td class="px-6 py-4 text-center text-slate-600">{{ .MTTA }}</td>
-                            <td class="px-6 py-4 text-center text-slate-600">{{ .MTTR }}</td>
-                            <td class="px-6 py-4 text-center font-bold text-green-600">{{ .BigBookContrib }}</td>
-                            <td class="px-6 py-4 text-center flex justify-center text-yellow-500">
-                                <i class="fas fa-star"></i> {{ .Rating }}
-                            </td>
-                        </tr>
-                        {{ else }}
-                        <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-slate-400">Belum ada data performance.
-                            </td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- 3.5 ROUTINES CONTENT (New Tab) -->
-        <!-- 3.5 ROUTINES CONTENT (Updated: Delete Button) -->
-        <div id="manager-content-routines" class="hidden fade-in slide-up">
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Routine Management</h2>
-                    <p class="text-slate-500 text-sm">Manage recurring tasks and checklists.</p>
-                </div>
-                <button onclick="openModal('new-routine-modal')"
-                    class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold text-white hover:bg-blue-700 shadow-sm shadow-blue-200">
-                    <i class="fas fa-plus mr-2"></i> New Routine
-                </button>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th class="px-6 py-4">Title</th>
-                            <!-- <th class="px-6 py-4">Schedule (Cron)</th> -->
-                            <th class="px-6 py-4">Deadline</th>
-                            <th class="px-6 py-4 text-center">Active</th>
-                            <th class="px-6 py-4 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {{ range .routineTemplates }}
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="px-6 py-4 font-bold text-slate-800">{{ .Title }}</td>
-                            <!-- <td class="px-6 py-4 font-mono text-xs bg-slate-50 rounded text-slate-600">{{ .CronSchedule }}</td> -->
-                            <td class="px-6 py-4">{{ .DeadlineMinutes }} mins</td>
-                            <td class="px-6 py-4 text-center">
-                                <form action="/manager/routines/{{ .ID }}/toggle-active" method="POST" class="inline">
-                                    <button type="submit" class="px-2 py-1 rounded text-xs font-bold transition
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-4">Title</th>
+                                    <!-- <th class="px-6 py-4">Schedule (Cron)</th> -->
+                                    <th class="px-6 py-4">Deadline</th>
+                                    <th class="px-6 py-4 text-center">Active</th>
+                                    <th class="px-6 py-4 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {{ range .routineTemplates }}
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-6 py-4 font-bold text-slate-800">{{ .Title }}</td>
+                                    <!-- <td class="px-6 py-4 font-mono text-xs bg-slate-50 rounded text-slate-600">{{ .CronSchedule }}</td> -->
+                                    <td class="px-6 py-4">{{ .DeadlineMinutes }} mins</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <form action="/manager/routines/{{ .ID }}/toggle-active" method="POST"
+                                            class="inline">
+                                            <button type="submit" class="px-2 py-1 rounded text-xs font-bold transition
                                         {{ if .IsActive }}
                                             bg-green-100 text-green-700 hover:bg-green-200
                                         {{ else }}
                                             bg-red-100 text-red-700 hover:bg-red-200
                                         {{ end }}"
-                                        title="{{ if .IsActive }}Deactivate{{ else }}Activate{{ end }} Routine">
-                                        {{ if .IsActive }}ACTIVE{{ else }}INACTIVE{{ end }}
-                                    </button>
-                                </form>
-                            </td>
-                            <td class="px-6 py-4 text-center">
-                                <!-- DELETE BUTTON REPLACING EDIT -->
-                                <form action="/manager/routines/{{ .ID }}/delete" method="POST"
-                                    onsubmit="return confirm('Delete this routine permanently?')" class="inline">
-                                    <button type="submit" class="text-slate-400 hover:text-red-600 transition"
-                                        title="Delete Routine">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {{ else }}
-                        <tr>
-                            <td colspan="5" class="p-8 text-center text-slate-400">No routines defined.</td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- NEW SHIFT MODAL (Manager Only) -->
-        <div id="new-shift-modal"
-            class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm">
-            <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800">Add New Shift</h3>
-                    <button onclick="closeModal('new-shift-modal')"
-                        class="text-slate-400 hover:text-red-500 transition">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <!-- Form using Real Data for Staff Dropdown -->
-                <form action="/manager/shifts/create" method="POST" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Staff
-                            Name</label>
-                        <select name="staff_id"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            {{ range .allStaff }}
-                            <option value="{{ .ID }}">{{ .FullName }}</option>
-                            {{ end }}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Shift
-                            Label</label>
-                        <input type="text" name="label" placeholder="e.g. Shift Pagi Special"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Start
-                                Time</label>
-                            <input type="datetime-local" name="start_time"
-                                class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">End
-                                Time</label>
-                            <input type="datetime-local" name="end_time"
-                                class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                    </div>
-                    <button type="submit"
-                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4">
-                        Save Schedule
-                    </button>
-                </form>
-
-                </form>
-            </div>
-        </div>
-
-        <!-- ================= MODALS ================= -->
-
-        <!-- 1. VIEW ARTICLE MODAL (Detail Published) -->
-        <div x-show="modals.view" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
-            style="display: none;">
-            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.view = false"></div>
-            <div
-                class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
-                    <div>
-                        <div class="flex items-center gap-2 mb-2">
-                            <span
-                                class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                                x-text="activeArticle.category"></span>
-                            <span class="text-xs text-slate-400" x-text="activeArticle.date"></span>
-                        </div>
-                        <h3 class="font-bold text-slate-800 text-xl" x-text="activeArticle.title"></h3>
-                        <p class="text-xs text-slate-500 mt-1">Author: <span x-text="activeArticle.author"></span></p>
-                    </div>
-                    <button @click="modals.view = false" class="text-slate-400 hover:text-red-500 transition"><i
-                            class="fas fa-times text-xl"></i></button>
-                </div>
-                <div class="flex-1 p-8 overflow-y-auto bg-white">
-                    <div class="prose prose-sm prose-slate max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed"
-                        x-text="activeArticle.content"></div>
-                </div>
-                <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-                    <button @click="modals.view = false; fetchAndOpen('edit', activeArticle.id)"
-                        class="text-blue-600 font-bold text-sm hover:underline px-4 py-2">
-                        <i class="fas fa-edit mr-1"></i> Edit
-                    </button>
-                    <button @click="modals.view = false"
-                        class="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-300 transition">Close</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. CREATE NEW ARTICLE MODAL -->
-        <div x-show="modals.new" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
-            style="display: none;">
-            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.new = false"></div>
-            <div
-                class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800">Write New Article</h3>
-                    <button @click="modals.new = false" class="text-slate-400 hover:text-red-500"><i
-                            class="fas fa-times"></i></button>
-                </div>
-                <form action="/manager/articles/create" method="POST" class="flex-1 overflow-y-auto p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
-                        <input type="text" name="title" required
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
-                        <select name="category"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="AUDIO">Audio</option>
-                            <option value="VIDEO">Video</option>
-                            <option value="IT_NETWORK">IT Network</option>
-                            <option value="SOFTWARE">Software</option>
-                            <option value="ELECTRICAL">Electrical</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
-                        <textarea name="content" required
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
-                    </div>
-                    <div class="pt-2"><button type="submit"
-                            class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">Publish
-                            Now</button></div>
-                </form>
-            </div>
-        </div>
-
-        <!-- 3. EDIT ARTICLE MODAL -->
-        <div x-show="modals.edit" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
-            style="display: none;">
-            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.edit = false"></div>
-            <div
-                class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800">Edit Article</h3>
-                    <button @click="modals.edit = false" class="text-slate-400 hover:text-red-500"><i
-                            class="fas fa-times"></i></button>
-                </div>
-                <form :action="'/manager/articles/' + activeArticle.id + '/update'" method="POST"
-                    class="flex-1 overflow-y-auto p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
-                        <input type="text" name="title" x-model="activeArticle.title" required
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
-                        <select name="category" x-model="activeArticle.category"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="AUDIO">Audio</option>
-                            <option value="VIDEO">Video</option>
-                            <option value="IT_NETWORK">IT Network</option>
-                            <option value="SOFTWARE">Software</option>
-                            <option value="ELECTRICAL">Electrical</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
-                        <textarea name="content" x-model="activeArticle.content" required
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
-                    </div>
-                    <div class="pt-2"><button type="submit"
-                            class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition">Save
-                            Changes</button></div>
-                </form>
-            </div>
-        </div>
-
-        <!-- REVIEW ARTICLE MODAL (POPUP) -->
-        <div x-show="reviewModalOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4 fade-in"
-            style="display: none;">
-            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="reviewModalOpen = false"></div>
-            <div
-                class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10">
-
-                <!-- Header -->
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-lg">Review Item</h3>
-                        <!-- Teks dinamis berdasarkan tipe -->
-                        <p class="text-xs text-slate-500"
-                            x-text="reviewArticle.type === 'ticket' ? 'Convert ticket solution to article or ignore.' : 'Approve draft to publish or delete.'">
-                        </p>
-                    </div>
-                    <button @click="reviewModalOpen = false" class="text-slate-400 hover:text-slate-600"><i
-                            class="fas fa-times text-xl"></i></button>
-                </div>
-
-                <!-- Scrollable Content -->
-                <div class="flex-1 overflow-y-auto p-8 bg-white">
-                    <div class="mb-6">
-                        <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase"
-                            x-text="reviewArticle.category"></span>
-                        <h2 class="text-2xl font-bold text-slate-800 mt-2 mb-1" x-text="reviewArticle.title"></h2>
-                        <p class="text-sm text-slate-500">Source: <span class="font-bold text-slate-700"
-                                x-text="reviewArticle.author"></span></p>
-                    </div>
-
-                    <div class="prose prose-sm prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap"
-                        x-text="reviewArticle.content">
+                                                title="{{ if .IsActive }}Deactivate{{ else }}Activate{{ end }} Routine">
+                                                {{ if .IsActive }}ACTIVE{{ else }}INACTIVE{{ end }}
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <!-- DELETE BUTTON REPLACING EDIT -->
+                                        <form action="/manager/routines/{{ .ID }}/delete" method="POST"
+                                            onsubmit="return confirm('Delete this routine permanently?')"
+                                            class="inline">
+                                            <button type="submit" class="text-slate-400 hover:text-red-600 transition"
+                                                title="Delete Routine">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="5" class="p-8 text-center text-slate-400">No routines defined.</td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <!-- Footer Actions -->
-                <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
-
-                    <!-- DENY FORM -->
-                    <form :action="getDenyAction()" method="POST" @submit="confirmDeny">
-
-                        <button type="submit"
-                            class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition flex items-center gap-2">
-                            <i class="fas fa-times"></i>
-                            <span x-text="reviewArticle.type === 'ticket' ? 'Ignore / Remove' : 'Deny & Delete'"></span>
-                        </button>
-                    </form>
-
-                    <!-- APPROVE FORM -->
-                    <form :action="getApproveAction()" method="POST">
-                        <button type="submit"
-                            class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition flex items-center gap-2">
-                            <i class="fas fa-check"></i> <span
-                                x-text="reviewArticle.type === 'ticket' ? 'Convert to Article' : 'Approve & Publish'"></span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- NEW ROUTINE MODAL -->
-        <div id="new-routine-modal"
-            class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
-            x-data="{ freq: 'DAILY', checklist: [''] }">
-            <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800">New Routine</h3>
-                    <button onclick="closeModal('new-routine-modal')"
-                        class="text-slate-400 hover:text-red-500 transition"><i class="fas fa-times"></i></button>
-                </div>
-
-                <form action="/manager/routines/create" method="POST"
-                    class="p-6 space-y-5 overflow-y-auto custom-scrollbar">
-
-                    <!-- Title -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Routine
-                            Title</label>
-                        <input type="text" name="title" required placeholder="e.g. Daily Studio Check"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-
-                    <!-- Frequency & Time Row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label
-                                class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Frequency</label>
-                            <select name="frequency" x-model="freq"
-                                class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="DAILY">Daily</option>
-                                <option value="WEEKLY">Weekly</option>
-                                <option value="MONTHLY">Monthly</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label
-                                class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Time</label>
-                            <input type="time" name="time" required
-                                class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                    </div>
-
-                    <!-- Conditional Day Inputs -->
-                    <div x-show="freq === 'WEEKLY'" class="slide-up">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day of
-                            Week</label>
-                        <select name="day_week"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="1">Monday</option>
-                            <option value="2">Tuesday</option>
-                            <option value="3">Wednesday</option>
-                            <option value="4">Thursday</option>
-                            <option value="5">Friday</option>
-                            <option value="6">Saturday</option>
-                            <option value="0">Sunday</option>
-                        </select>
-                    </div>
-
-                    <div x-show="freq === 'MONTHLY'" class="slide-up">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day of
-                            Month</label>
-                        <input type="number" name="day_month" min="1" max="31" placeholder="1-31"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-
-                    <!-- Deadline -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Submission
-                            Deadline (Mins)</label>
-                        <input type="number" name="deadline_minutes" value="30"
-                            class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-
-                    <!-- Dynamic Checklist -->
-                    <div class="pt-2 border-t border-slate-100">
-                        <div class="flex justify-between items-center mb-3">
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide">Checklist
-                                Items</label>
-                            <button type="button" @click="checklist.push('')"
-                                class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-100 transition">
-                                <i class="fas fa-plus mr-1"></i> Add Item
+                <!-- NEW SHIFT MODAL (Manager Only) -->
+                <div id="new-shift-modal"
+                    class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm">
+                    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">Add New Shift</h3>
+                            <button onclick="closeModal('new-shift-modal')"
+                                class="text-slate-400 hover:text-red-500 transition">
+                                <i class="fas fa-times"></i>
                             </button>
                         </div>
-
-                        <div class="space-y-2">
-                            <template x-for="(item, index) in checklist" :key="index">
-                                <div class="flex gap-2 slide-up">
-                                    <input type="text" name="checklist_items" x-model="checklist[index]"
-                                        placeholder="Task description..." required
-                                        class="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-600">
-                                    <button type="button"
-                                        @click="checklist.length > 1 ? checklist.splice(index, 1) : null"
-                                        class="text-slate-400 hover:text-red-500 px-2 transition"
-                                        :class="{'opacity-50 cursor-not-allowed': checklist.length <= 1}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                        <!-- Form using Real Data for Staff Dropdown -->
+                        <form action="/manager/shifts/create" method="POST" class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Staff
+                                    Name</label>
+                                <select name="staff_id"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                    {{ range .allStaff }}
+                                    <option value="{{ .ID }}">{{ .FullName }}</option>
+                                    {{ end }}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Shift
+                                    Label</label>
+                                <input type="text" name="label" placeholder="e.g. Shift Pagi Special"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Start
+                                        Time</label>
+                                    <input type="datetime-local" name="start_time"
+                                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                                 </div>
-                            </template>
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">End
+                                        Time</label>
+                                    <input type="datetime-local" name="end_time"
+                                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                </div>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4">
+                                Save Schedule
+                            </button>
+                        </form>
+
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ================= MODALS ================= -->
+
+                <!-- 1. VIEW ARTICLE MODAL (Detail Published) -->
+                <div x-show="modals.view" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+                    style="display: none;">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.view = false"></div>
+                    <div
+                        class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span
+                                        class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                        x-text="activeArticle.category"></span>
+                                    <span class="text-xs text-slate-400" x-text="activeArticle.date"></span>
+                                </div>
+                                <h3 class="font-bold text-slate-800 text-xl" x-text="activeArticle.title"></h3>
+                                <p class="text-xs text-slate-500 mt-1">Author: <span
+                                        x-text="activeArticle.author"></span></p>
+                            </div>
+                            <button @click="modals.view = false" class="text-slate-400 hover:text-red-500 transition"><i
+                                    class="fas fa-times text-xl"></i></button>
+                        </div>
+                        <div class="flex-1 p-8 overflow-y-auto bg-white">
+                            <div class="prose prose-sm prose-slate max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed"
+                                x-text="activeArticle.content"></div>
+                        </div>
+                        <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                            <button @click="modals.view = false; fetchAndOpen('edit', activeArticle.id)"
+                                class="text-blue-600 font-bold text-sm hover:underline px-4 py-2">
+                                <i class="fas fa-edit mr-1"></i> Edit
+                            </button>
+                            <button @click="modals.view = false"
+                                class="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-300 transition">Close</button>
                         </div>
                     </div>
+                </div>
 
-                    <button type="submit"
-                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4 hover-scale">
-                        Create Routine
-                    </button>
-                </form>
-            </div>
-        </div>
+                <!-- 2. CREATE NEW ARTICLE MODAL -->
+                <div x-show="modals.new" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+                    style="display: none;">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.new = false"></div>
+                    <div
+                        class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">Write New Article</h3>
+                            <button @click="modals.new = false" class="text-slate-400 hover:text-red-500"><i
+                                    class="fas fa-times"></i></button>
+                        </div>
+                        <form action="/manager/articles/create" method="POST"
+                            class="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
+                                <input type="text" name="title" required
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                                <select name="category"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="AUDIO">Audio</option>
+                                    <option value="VIDEO">Video</option>
+                                    <option value="IT_NETWORK">IT Network</option>
+                                    <option value="SOFTWARE">Software</option>
+                                    <option value="ELECTRICAL">Electrical</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
+                                <textarea name="content" required
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                            </div>
+                            <div class="pt-2"><button type="submit"
+                                    class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">Publish
+                                    Now</button></div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 3. EDIT ARTICLE MODAL -->
+                <div x-show="modals.edit" class="fixed inset-0 z-[80] flex items-center justify-center p-4 fade-in"
+                    style="display: none;">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modals.edit = false"></div>
+                    <div
+                        class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">Edit Article</h3>
+                            <button @click="modals.edit = false" class="text-slate-400 hover:text-red-500"><i
+                                    class="fas fa-times"></i></button>
+                        </div>
+                        <form :action="'/manager/articles/' + activeArticle.id + '/update'" method="POST"
+                            class="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Title</label>
+                                <input type="text" name="title" x-model="activeArticle.title" required
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+                                <select name="category" x-model="activeArticle.category"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="AUDIO">Audio</option>
+                                    <option value="VIDEO">Video</option>
+                                    <option value="IT_NETWORK">IT Network</option>
+                                    <option value="SOFTWARE">Software</option>
+                                    <option value="ELECTRICAL">Electrical</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Content</label>
+                                <textarea name="content" x-model="activeArticle.content" required
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm h-48 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                            </div>
+                            <div class="pt-2"><button type="submit"
+                                    class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition">Save
+                                    Changes</button></div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- REVIEW ARTICLE MODAL (POPUP) -->
+                <div x-show="reviewModalOpen" class="fixed inset-0 z-[90] flex items-center justify-center p-4 fade-in"
+                    style="display: none;">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="reviewModalOpen = false"></div>
+                    <div
+                        class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10">
+
+                        <!-- Header -->
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-lg">Review Item</h3>
+                                <!-- Teks dinamis berdasarkan tipe -->
+                                <p class="text-xs text-slate-500"
+                                    x-text="reviewArticle.type === 'ticket' ? 'Convert ticket solution to article or ignore.' : 'Approve draft to publish or delete.'">
+                                </p>
+                            </div>
+                            <button @click="reviewModalOpen = false" class="text-slate-400 hover:text-slate-600"><i
+                                    class="fas fa-times text-xl"></i></button>
+                        </div>
+
+                        <!-- Scrollable Content -->
+                        <div class="flex-1 overflow-y-auto p-8 bg-white">
+                            <div class="mb-6">
+                                <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase"
+                                    x-text="reviewArticle.category"></span>
+                                <h2 class="text-2xl font-bold text-slate-800 mt-2 mb-1" x-text="reviewArticle.title">
+                                </h2>
+                                <p class="text-sm text-slate-500">Source: <span class="font-bold text-slate-700"
+                                        x-text="reviewArticle.author"></span></p>
+                            </div>
+
+                            <div class="prose prose-sm prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap"
+                                x-text="reviewArticle.content">
+                            </div>
+                        </div>
+
+                        <!-- Footer Actions -->
+                        <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
+
+                            <!-- DENY FORM -->
+                            <form :action="getDenyAction()" method="POST" @submit="confirmDeny">
+
+                                <button type="submit"
+                                    class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition flex items-center gap-2">
+                                    <i class="fas fa-times"></i>
+                                    <span
+                                        x-text="reviewArticle.type === 'ticket' ? 'Ignore / Remove' : 'Deny & Delete'"></span>
+                                </button>
+                            </form>
+
+                            <!-- APPROVE FORM -->
+                            <form :action="getApproveAction()" method="POST">
+                                <button type="submit"
+                                    class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition flex items-center gap-2">
+                                    <i class="fas fa-check"></i> <span
+                                        x-text="reviewArticle.type === 'ticket' ? 'Convert to Article' : 'Approve & Publish'"></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW ROUTINE MODAL -->
+                <div id="new-routine-modal"
+                    class="hidden fixed inset-0 bg-slate-900/60 z-[80] flex items-center justify-center p-4 fade-in backdrop-blur-sm"
+                    x-data="{ freq: 'DAILY', checklist: [''] }">
+                    <div
+                        class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 class="font-bold text-slate-800">New Routine</h3>
+                            <button onclick="closeModal('new-routine-modal')"
+                                class="text-slate-400 hover:text-red-500 transition"><i
+                                    class="fas fa-times"></i></button>
+                        </div>
+
+                        <form action="/manager/routines/create" method="POST"
+                            class="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+
+                            <!-- Title -->
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Routine
+                                    Title</label>
+                                <input type="text" name="title" required placeholder="e.g. Daily Studio Check"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <!-- Frequency & Time Row -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Frequency</label>
+                                    <select name="frequency" x-model="freq"
+                                        class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="DAILY">Daily</option>
+                                        <option value="WEEKLY">Weekly</option>
+                                        <option value="MONTHLY">Monthly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Time</label>
+                                    <input type="time" name="time" required
+                                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                </div>
+                            </div>
+
+                            <!-- Conditional Day Inputs -->
+                            <div x-show="freq === 'WEEKLY'" class="slide-up">
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day
+                                    of
+                                    Week</label>
+                                <select name="day_week"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                    <option value="0">Sunday</option>
+                                </select>
+                            </div>
+
+                            <div x-show="freq === 'MONTHLY'" class="slide-up">
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Day
+                                    of
+                                    Month</label>
+                                <input type="number" name="day_month" min="1" max="31" placeholder="1-31"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <!-- Deadline -->
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Submission
+                                    Deadline (Mins)</label>
+                                <input type="number" name="deadline_minutes" value="30"
+                                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <!-- Dynamic Checklist -->
+                            <div class="pt-2 border-t border-slate-100">
+                                <div class="flex justify-between items-center mb-3">
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase tracking-wide">Checklist
+                                        Items</label>
+                                    <button type="button" @click="checklist.push('')"
+                                        class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-100 transition">
+                                        <i class="fas fa-plus mr-1"></i> Add Item
+                                    </button>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <template x-for="(item, index) in checklist" :key="index">
+                                        <div class="flex gap-2 slide-up">
+                                            <input type="text" name="checklist_items" x-model="checklist[index]"
+                                                placeholder="Task description..." required
+                                                class="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-600">
+                                            <button type="button"
+                                                @click="checklist.length > 1 ? checklist.splice(index, 1) : null"
+                                                class="text-slate-400 hover:text-red-500 px-2 transition"
+                                                :class="{'opacity-50 cursor-not-allowed': checklist.length <= 1}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <button type="submit"
+                                class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 mt-4 hover-scale">
+                                Create Routine
+                            </button>
+                        </form>
+                    </div>
+                </div>
 
     </main>
 </div>

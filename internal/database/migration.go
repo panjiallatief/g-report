@@ -16,8 +16,18 @@ func AutoMigrate(db *gorm.DB) {
 		schemaPath := "internal/models/optimize_schema.sql"
 		content, err := ioutil.ReadFile(schemaPath)
 		if err != nil {
-			log.Printf("Error reading schema file from %s: %v\n", schemaPath, err)
-			return
+			// Try relative path for tests (2 levels)
+			schemaPath = "../../internal/models/optimize_schema.sql"
+			content, err = ioutil.ReadFile(schemaPath)
+			if err != nil {
+				// Try relative path for tests (3 levels)
+				schemaPath = "../../../internal/models/optimize_schema.sql"
+				content, err = ioutil.ReadFile(schemaPath)
+				if err != nil {
+					log.Printf("Error reading schema file from %s: %v\n", schemaPath, err)
+					return
+				}
+			}
 		}
 		if err := db.Exec(string(content)).Error; err != nil {
 			log.Fatal("Failed to execute schema migration: ", err)

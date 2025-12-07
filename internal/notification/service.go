@@ -13,8 +13,8 @@ import (
 // Default VAPID Keys for Development (Should be in .env in production)
 // You can generate new ones using: webpush-go.GenerateVAPIDKeys()
 const (
-	DefaultVapidPublicKey  = "BKP_B_q-P2y_q-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a" // Contoh dummy pendek, diganti di init
-	DefaultVapidPrivateKey = "your-private-key"
+	DefaultVapidPublicKey  = "BOxM_47kkdGUPaHr9MYzecqhuK1QZ2lD-31sAkjkKyf1R-1yWp6VJZL5LY630MUrmQplp0RzLAkMB6cvqYoJmiU"
+	DefaultVapidPrivateKey = "8TRcnVroyyQuv2bB3Zrmjk8IS3QMVBjbYAu8xR8ODhs"
 )
 
 var (
@@ -24,24 +24,12 @@ var (
 
 func InitKeys() {
 	// Coba load dari ENV, kalau tidak ada pakai hardcoded DEV keys
-	// Note: Key di bawah ini digenerate untuk keperluan demo agar langsung jalan.
-	// Jangan dipakai di production sungguhan.
 	VapidPublicKey = os.Getenv("VAPID_PUBLIC_KEY")
 	if VapidPublicKey == "" {
-		VapidPublicKey = "BBNcwOmf-2q_Gq-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a-Z_q-a" 
-		// Menggunakan key valid random untuk demo:
-		VapidPublicKey = "BCmC6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6_6" // Placeholder, see logic below
+		VapidPublicKey = DefaultVapidPublicKey
+		VapidPrivateKey = DefaultVapidPrivateKey
 		
-		// Generate real keys on startup for this demo session if env missing
-		privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
-		if err == nil {
-			VapidPrivateKey = privateKey
-			VapidPublicKey = publicKey
-			log.Println("Generated Ephemeral VAPID Keys for this session:")
-			log.Println("Public:", VapidPublicKey)
-		} else {
-			log.Fatal("Failed to generate VAPID keys")
-		}
+		log.Println("Using Fixed Development VAPID Keys")
 	} else {
 		VapidPrivateKey = os.Getenv("VAPID_PRIVATE_KEY")
 	}
@@ -56,9 +44,11 @@ func SendBroadcastToStaff(title, message, url string) {
 		Find(&subs)
 
 	if len(subs) == 0 {
-		log.Println("No staff subscriptions found.")
+		log.Println("No staff subscriptions found in database.")
 		return
 	}
+
+	log.Printf("Found %d staff subscriptions. Preparing to send push...", len(subs))
 
 	// 2. Siapkan Payload JSON
 	payloadData := map[string]string{

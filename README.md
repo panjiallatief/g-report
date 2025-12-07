@@ -104,3 +104,30 @@ G-Report is a comprehensive IT Operations and Helpdesk management system designe
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+## 🧪 Testing Strategy & Report
+
+We use a modified **Testing Pyramid** strategy to ensure high quality and reliability.
+
+### Strategy
+1.  **Unit Tests (Base)**: Test pure logic (e.g., Utils, Crypto).
+2.  **Integration Tests (Core)**: Test Handlers, Database, and Middleware interactions using a dedicated test database environment.
+3.  **E2E Tests**: Manual or automated browser tests (Playwright/Cypress).
+
+### Current Test Status
+
+| Component | Type | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **Crypto Utils** | Unit | ✅ PASS | Password hashing/validation secure. |
+| **Auth Module** | Integration | ⚠️ CHECK | Login flow verification. |
+| **Consumer Module** | Integration | ⚠️ CHECK | Dashboard & Ticket flow verification. |
+
+### How to Run Tests
+```bash
+# Run all tests
+go test ./internal/... -v
+```
+
+> [!NOTE]
+> Tests require a local PostgreSQL instance. The test suite automatically manages the `it_broadcast_test` database.
+

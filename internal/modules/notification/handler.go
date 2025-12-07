@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"log"
 )
 
 func RegisterRoutes(r *gin.Engine) {
@@ -53,19 +54,25 @@ func Subscribe(c *gin.Context) {
 	var existing models.PushSubscription
 	if err := database.DB.Where("endpoint = ?", req.Endpoint).First(&existing).Error; err == nil {
 		// Update user jika endpoint sama tapi user beda (login di device sama)
+		log.Printf("Updating existing subscription for user %s (Endpoint: len=%d)", userID, len(req.Endpoint))
 		existing.UserID = userID
 		existing.P256dh = req.Keys.P256dh
 		existing.Auth = req.Keys.Auth
 		database.DB.Save(&existing)
 	} else {
 		// Create Baru
+		log.Printf("Creating NEW subscription for user %s (Endpoint: len=%d)", userID, len(req.Endpoint))
 		newSub := models.PushSubscription{
 			UserID:   userID,
 			Endpoint: req.Endpoint,
 			P256dh:   req.Keys.P256dh,
 			Auth:     req.Keys.Auth,
 		}
-		database.DB.Create(&newSub)
+		if result := database.DB.Create(&newSub); result.Error != nil {
+			log.Printf("ERROR saving subscription: %v", result.Error)
+			c.JSON(500, gin.H{"error": "Failed to save subscription"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Subscribed successfully"})
