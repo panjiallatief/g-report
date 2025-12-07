@@ -22,47 +22,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .slide-up {
-            animation: slideUp 0.4s ease-out;
-        }
-
-        .hover-scale {
-            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .hover-scale:hover {
-            transform: scale(1.02);
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(20px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+        .hover-scale { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .hover-scale:hover { transform: scale(1.02); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 
@@ -84,9 +50,7 @@
             </div>
             <div class="flex gap-2 shrink-0">
                 <button onclick="dismissPushBanner()"
-                    class="px-3 py-2 text-xs text-blue-200 hover:text-white font-medium">
-                    Nanti
-                </button>
+                    class="px-3 py-2 text-xs text-blue-200 hover:text-white font-medium">Nanti</button>
                 <button id="btn-activate-push" onclick="requestPushPermission()"
                     class="px-4 py-2 bg-white text-blue-600 rounded-lg text-xs font-bold shadow-lg hover:bg-blue-50 transition transform active:scale-95 flex items-center justify-center min-w-[80px]">
                     Aktifkan
@@ -95,8 +59,7 @@
         </div>
     </div>
 
-    <div id="https-warning"
-        class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-2 z-[9999] text-center text-xs font-bold">
+    <div id="https-warning" class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-2 z-[9999] text-center text-xs font-bold">
         ⚠️ Fitur Notifikasi memerlukan HTTPS (Ngrok) atau Localhost.
     </div>
 
@@ -112,15 +75,10 @@
             return outputArray;
         }
 
-        // Fungsi Register Sederhana
         async function getOrRegisterSW() {
             if (!('serviceWorker' in navigator)) return null;
-
-            // Cek registrasi yang sudah ada di Root scope
             let reg = await navigator.serviceWorker.getRegistration('/');
-
             if (!reg) {
-                // Jika belum ada, register baru
                 try {
                     reg = await navigator.serviceWorker.register('/sw.js');
                     console.log('[SW] New registration successful:', reg.scope);
@@ -139,64 +97,54 @@
             btn.disabled = true;
 
             try {
-                // 1. Dapatkan SW Registration
                 const registration = await getOrRegisterSW();
-
                 if (!registration) throw new Error("Service Worker gagal dimuat.");
 
-                // 2. Ambil VAPID Key dari Backend
-                // [FIX] Tambahkan header ngrok-skip-browser-warning untuk menghindari halaman sela Ngrok
-                console.log('[Push] Mengambil VAPID Key...');
+                console.log('[Push] Fetching VAPID Key...');
                 const response = await fetch('/notifications/vapid-public-key', {
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
-
-                if (!response.ok) throw new Error("Gagal mengambil kunci server (" + response.status + ")");
+                
+                if (!response.ok) throw new Error("Gagal mengambil kunci server");
                 const data = await response.json();
-
-                if (!data.publicKey) throw new Error("Kunci VAPID kosong.");
                 const applicationServerKey = urlBase64ToUint8Array(data.publicKey);
 
-                // 3. [PENTING] Hapus Subscription Lama (Clean State)
-                // Jika ada subscription lama dengan key berbeda, subscribe baru akan gagal
+                // Unsubscribe Old
                 const existingSub = await registration.pushManager.getSubscription();
                 if (existingSub) {
-                    console.log('[Push] Menghapus subscription lama...');
+                    console.log('[Push] Removing old sub...');
                     await existingSub.unsubscribe();
                 }
 
-                // 4. Subscribe Push Baru
-                console.log('[Push] Melakukan Subscription...');
+                console.log('[Push] Subscribing new...');
                 const subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: applicationServerKey
                 });
 
-                // 5. Kirim ke Backend
-                console.log('[Push] Mengirim ke Backend...');
-                await fetch('/notifications/subscribe', {
+                console.log('[Push] Sending to backend...');
+                const resSub = await fetch('/notifications/subscribe', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'ngrok-skip-browser-warning': 'true'
-                    },
+                    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
                     body: JSON.stringify(subscription)
                 });
 
+                if (!resSub.ok) throw new Error("Backend save failed: " + resSub.status);
+
+                localStorage.setItem('push_subscribed_success', 'true');
                 document.getElementById('push-permission-banner').classList.add('hidden');
-                alert('Sukses! Notifikasi aktif.');
+                
+                // [TEST] Coba kirim notifikasi test lokal
+                registration.showNotification('Notifikasi Aktif!', {
+                    body: 'Sistem notifikasi telah berhasil diaktifkan.',
+                    icon: 'https://cdn-icons-png.flaticon.com/512/906/906309.png'
+                });
+
+                alert('Sukses! Anda akan menerima notifikasi tiket urgent.');
 
             } catch (err) {
                 console.error('[Push] Error Detail:', err);
-
-                if (Notification.permission === 'denied') {
-                    alert('Izin diblokir browser. Mohon reset izin notifikasi (klik icon gembok di URL bar).');
-                } else if (err.message.includes('push service error')) {
-                    alert('Gagal menghubungi layanan Push Google. Pastikan internet stabil & Google Play Services aktif (jika di Emulator/HP).');
-                } else {
-                    alert('Gagal: ' + err.message);
-                }
-
+                alert('Gagal: ' + err.message);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
@@ -208,13 +156,12 @@
         }
 
         window.addEventListener('load', async () => {
-            // Cek HTTPS
             if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
                 document.getElementById('https-warning').classList.remove('hidden');
                 return;
             }
 
-            // Bersihkan SW lama (static) jika ada
+            // Cleanup old SW
             navigator.serviceWorker.getRegistration('/static/sw.js').then(reg => {
                 if (reg) reg.unregister().then(() => window.location.reload());
             });
@@ -223,23 +170,24 @@
             if (reg) {
                 const sub = await reg.pushManager.getSubscription();
                 const isDismissed = localStorage.getItem('push_banner_dismissed') === 'true';
-
-                // Debug Reset via URL
+                const isManualSuccess = localStorage.getItem('push_subscribed_success') === 'true';
+                
+                // Debug Reset via URL ?reset_push=true
                 if (new URLSearchParams(window.location.search).get('reset_push') === 'true') {
                     if (sub) await sub.unsubscribe();
                     localStorage.removeItem('push_banner_dismissed');
+                    localStorage.removeItem('push_subscribed_success');
                     await reg.unregister();
                     alert('Reset Complete. Reloading...');
                     window.location.href = window.location.pathname;
                     return;
                 }
 
-                if (!sub && Notification.permission !== 'denied' && !isDismissed) {
+                if (!sub && Notification.permission !== 'denied' && !isDismissed && !isManualSuccess) {
                     document.getElementById('push-permission-banner').classList.remove('hidden');
                 }
             }
         });
     </script>
 </body>
-
 </html>

@@ -9,64 +9,77 @@ const urlsToCache = [
   'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js'
 ];
 
-// 1. Install & Force Active
 self.addEventListener('install', event => {
-  // [FIX] Paksa SW baru untuk langsung aktif (skip waiting phase)
   self.skipWaiting();
-  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[SW] Opened cache');
-        // Gunakan catch agar jika satu file gagal cache, install tetap jalan
         return cache.addAll(urlsToCache).catch(err => console.error('[SW] Cache error:', err));
       })
   );
 });
 
-// 2. Activate & Claim Clients
 self.addEventListener('activate', event => {
-  // [FIX] Langsung kontrol semua klien yang terbuka tanpa perlu reload
   event.waitUntil(clients.claim());
   console.log('[SW] Activated & Clients claimed');
 });
 
-// 3. Fetch Request
 self.addEventListener('fetch', event => {
-  // Strategi: Network First, Fallback Cache (Lebih aman untuk app dinamis)
   event.respondWith(
-    fetch(event.request)
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
-// 4. Push Notification Listener
+// [FIX] Improved Push Listener
 self.addEventListener('push', function(event) {
-  if (event.data) {
-    const data = event.data.json();
-    
-    const options = {
-      body: data.body,
-      icon: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
-      badge: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
-      vibrate: [100, 50, 100],
-      data: {
-        url: data.url || '/' 
-      }
-    };
+  console.log('[SW] Push Received:', event);
 
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
+  let data = { title: 'New Notification', body: 'Check app for details.', url: '/' };
+
+  if (event.data) {
+    try {
+      const json = event.data.json();
+      data = { ...data, ...json }; // Merge default with incoming
+    } catch (e) {
+      console.warn('[SW] Push data is not JSON:', event.data.text());
+      data.body = event.data.text();
+    }
   }
+
+  const options = {
+    body: data.body,
+    icon: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
+    badge: 'https://cdn-icons-png.flaticon.com/512/906/906309.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: data.url
+    },
+    // Menambahkan tag agar notifikasi tidak menumpuk jika topiknya sama
+    tag: 'it-ops-notification' 
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
 });
 
-// 5. Notification Click
 self.addEventListener('notificationclick', function(event) {
+  console.log('[SW] Notification Clicked');
   event.notification.close();
+  
   event.waitUntil(
-    clients.openWindow(event.notification.data.url)
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // Jika tab sudah terbuka, fokuskan
+      for (let client of windowClients) {
+        if (client.url === event.notification.data.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Jika tidak, buka tab baru
+      if (clients.openWindow) {
+        return clients.openWindow(event.notification.data.url);
+      }
+    })
   );
 });
