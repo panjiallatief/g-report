@@ -1,9 +1,14 @@
-```html
 {{ define "content" }}
 <!-- Cropper.js CSS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
 
-<div class="max-w-[480px] mx-auto min-h-screen bg-white flex flex-col relative fade-in">
+<div class="max-w-[480px] mx-auto min-h-screen bg-white flex flex-col relative fade-in" x-data="{ 
+        notifActive: false,
+        async check() {
+            this.notifActive = await window.NotifSystem.checkStatus();
+        }
+     }" x-init="check(); window.addEventListener('push-subscription-changed', (e) => notifActive = e.detail.active)">
+
     <!-- Header -->
     <div class="bg-white p-4 flex items-center gap-4 border-b border-slate-100">
         <a href="/staff" class="text-slate-400 hover:text-slate-800"><i class="fas fa-arrow-left text-xl"></i></a>
@@ -39,59 +44,90 @@
         </button>
     </form>
 
-    <div class="px-6 pb-6 w-full">
-        <!-- Stats -->
-        <div class="grid grid-cols-3 gap-4 w-full mb-8 slide-up" style="animation-delay: 100ms;">
-            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
-                <span class="block text-2xl font-bold text-blue-600">12</span>
-                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tiket</span>
-            </div>
-            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
-                <span class="block text-2xl font-bold text-green-600">95%</span>
-                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">On-Time</span>
-            </div>
-            <div class="bg-slate-50 p-4 rounded-2xl text-center border border-slate-100">
-                <span class="block text-2xl font-bold text-indigo-600">8</span>
-                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Shift</span>
+    <div class="px-6 pb-24 w-full space-y-6">
+
+        <!-- PENGATURAN NOTIFIKASI (BARU) -->
+        <div>
+            <h3 class="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wide">Notifikasi</h3>
+            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                            :class="notifActive ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'">
+                            <i class="fas" :class="notifActive ? 'fa-bell' : 'fa-bell-slash'"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-700 text-sm">Push Notification</p>
+                            <p class="text-xs" :class="notifActive ? 'text-green-600 font-bold' : 'text-slate-400'">
+                                <span x-text="notifActive ? 'Aktif di perangkat ini' : 'Tidak Aktif'"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Toggle (Aktifkan) jika Mati -->
+                    <button x-show="!notifActive" @click="window.NotifSystem.subscribe('btn-profile-sub')"
+                        id="btn-profile-sub"
+                        class="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">
+                        Aktifkan
+                    </button>
+                </div>
+
+                <!-- Kontrol jika Aktif (Test & Matikan) -->
+                <div x-show="notifActive" class="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3" x-transition>
+                    <button @click="window.NotifSystem.test('btn-profile-test')" id="btn-profile-test"
+                        class="flex items-center justify-center gap-2 bg-slate-50 text-slate-700 border border-slate-200 py-2 rounded-lg text-xs font-bold hover:bg-slate-100 transition">
+                        <i class="fas fa-paper-plane"></i> Test Kirim
+                    </button>
+                    <button @click="window.NotifSystem.unsubscribe('btn-profile-unsub')" id="btn-profile-unsub"
+                        class="flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition">
+                        <i class="fas fa-ban"></i> Matikan
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- Quick Actions -->
-        <div class="w-full space-y-3">
-            <button
-                class="w-full bg-white border border-slate-200 p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition group">
-                <div class="flex items-center gap-4">
-                    <div
-                        class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition">
-                        <i class="fas fa-lock"></i>
+        <div>
+            <h3 class="font-bold text-slate-800 mb-3 text-sm uppercase tracking-wide">Akun</h3>
+            <div class="space-y-3">
+                <button
+                    class="w-full bg-white border border-slate-200 p-4 rounded-xl flex items-center justify-between hover:bg-slate-50 transition group">
+                    <div class="flex items-center gap-4">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <span class="font-bold text-slate-700">Ganti Password</span>
                     </div>
-                    <span class="font-bold text-slate-700">Ganti Password</span>
-                </div>
-                <i class="fas fa-chevron-right text-slate-300"></i>
-            </button>
-            <a href="/auth/logout"
-                class="w-full bg-red-50 border border-red-100 p-4 rounded-xl flex items-center justify-between hover:bg-red-100 transition group mt-8">
-                <div class="flex items-center gap-4">
-                    <div
-                        class="w-10 h-10 rounded-full bg-white text-red-500 flex items-center justify-center shadow-sm">
-                        <i class="fas fa-sign-out-alt"></i>
+                    <i class="fas fa-chevron-right text-slate-300"></i>
+                </button>
+                <a href="/auth/logout"
+                    class="w-full bg-red-50 border border-red-100 p-4 rounded-xl flex items-center justify-between hover:bg-red-100 transition group">
+                    <div class="flex items-center gap-4">
+                        <div
+                            class="w-10 h-10 rounded-full bg-white text-red-500 flex items-center justify-center shadow-sm">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </div>
+                        <span class="font-bold text-red-600">Logout</span>
                     </div>
-                    <span class="font-bold text-red-600">Logout</span>
-                </div>
-            </a>
+                </a>
+            </div>
         </div>
     </div>
+
     <!-- BOTTOM NAV (IT STAFF) -->
-    <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-slate-200 flex justify-around py-3 px-2 text-[10px] font-bold text-slate-400 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
+    <nav
+        class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-slate-200 flex justify-around py-3 px-2 text-[10px] font-bold text-slate-400 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
         <a href="/staff" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
             <i class="fas fa-home text-lg"></i> Home
         </a>
         <a href="/staff/alerts" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition relative">
             <i class="fas fa-bell text-lg"></i> Alert
             {{ if .urgentCount }}
-                {{ if gt .urgentCount 0 }}
-                <span class="absolute top-0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-                {{ end }}
+            {{ if gt .urgentCount 0 }}
+            <span
+                class="absolute top-0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+            {{ end }}
             {{ end }}
         </a>
         <a href="/staff/history" class="flex flex-col items-center gap-1.5 hover:text-blue-600 w-16 transition">
@@ -103,7 +139,7 @@
     </nav>
 </div>
 
-<!-- Image Cropper Modal -->
+<!-- Image Cropper Modal (Tetap sama) -->
 <div id="cropperModal" class="hidden fixed inset-0 z-[60] bg-black/90 flex flex-col">
     <div class="flex justify-between items-center p-4 text-white">
         <h3 class="font-bold">Sesuaikan Foto</h3>
@@ -121,7 +157,7 @@
     </div>
 </div>
 
-<!-- Scripts -->
+<!-- Scripts Cropper (Tetap sama) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <script>
     let cropper;
@@ -133,22 +169,18 @@
     avatarInput.addEventListener('change', function (e) {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-
-            // Size Check (2MB)
             if (file.size > 2 * 1024 * 1024) {
                 alert("Ukuran foto terlalu besar! Maksimal 2MB.");
                 this.value = '';
                 return;
             }
-
             const reader = new FileReader();
             reader.onload = function (evt) {
                 imageToCrop.src = evt.target.result;
                 modal.classList.remove('hidden');
-
                 if (cropper) cropper.destroy();
                 cropper = new Cropper(imageToCrop, {
-                    aspectRatio: 1, // Square for avatar
+                    aspectRatio: 1,
                     viewMode: 1,
                     dragMode: 'move',
                     autoCropArea: 0.8,
@@ -160,39 +192,32 @@
 
     function closeCropper() {
         modal.classList.add('hidden');
-        avatarInput.value = ''; // Reset input so change event fires again if same file
+        avatarInput.value = '';
         if (cropper) cropper.destroy();
     }
 
     function cropAndSave() {
         if (!cropper) return;
-
         cropper.getCroppedCanvas({
-            width: 400, // Resize to reasonable avatar size
+            width: 400,
             height: 400
         }).toBlob((blob) => {
             croppedBlob = blob;
-            // Update preview
             const url = URL.createObjectURL(blob);
             document.getElementById('avatarPreview').src = url;
             closeCropper();
-
-            // IMPORTANT: We don't restore avatarInput value, because we will send 'croppedBlob' instead
         }, 'image/jpeg', 0.8);
     }
 
     document.getElementById('saveBtn').addEventListener('click', function () {
         const formData = new FormData();
         formData.append('fullname', document.getElementById('fullnameInput').value);
-
         if (croppedBlob) {
             formData.append('avatar', croppedBlob, 'avatar.jpg');
         } else if (avatarInput.files[0]) {
-            // If user somehow selected file but bypassed crop (unlikely with this logic, but backup)
             formData.append('avatar', avatarInput.files[0]);
         }
 
-        // Show loading state
         const btn = this;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
@@ -220,4 +245,3 @@
     });
 </script>
 {{ end }}
-```

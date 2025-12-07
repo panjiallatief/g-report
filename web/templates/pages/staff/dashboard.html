@@ -85,19 +85,45 @@
             </h3>
             <div class="space-y-3" id="active-tickets-list" hx-get="/staff/tickets/list" hx-trigger="every 10s"
                 hx-swap="innerHTML">
-                <!-- Initial Load (Duplicate logic manually to avoid template import complexity inside block) -->
+                <!-- Initial Load Logic (Matching Partial) -->
                 {{ range .tickets }}
-                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 {{ if eq .Priority "URGENT_ON_AIR" }}border-red-500{{ else }}border-purple-500{{ end }} active:scale-[0.98] transition transform cursor-pointer border-t border-r border-b border-slate-100"
+                <div class="p-4 rounded-xl shadow-sm border-l-4 active:scale-[0.98] transition transform cursor-pointer border-t border-r border-b border-slate-100
+                    {{ if eq .Priority " URGENT_ON_AIR" }} bg-red-50 border-red-500 hover:bg-red-100 shadow-red-100 {{
+                    else }} bg-white border-purple-500 hover:border-purple-400 {{ end }}"
                     onclick="window.location.href='/staff/tickets/{{ .ID }}'">
+
                     <div class="flex justify-between items-start">
-                        <h4 class="font-bold text-sm text-slate-800">{{ .Subject }}</h4>
-                        <span class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold">{{ .CreatedAt.Format "15:04" }}</span>
+                        <h4 class="font-bold text-sm {{ if eq .Priority " URGENT_ON_AIR" }}text-red-900{{ else
+                            }}text-slate-800{{ end }}">
+                            {{ .Subject }}
+                        </h4>
+                        <div class="flex items-center gap-1">
+                            {{ if eq .Priority "URGENT_ON_AIR" }}
+                            <span
+                                class="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded uppercase font-bold animate-pulse shadow-sm">
+                                <i class="fas fa-circle text-[6px] mr-0.5"></i> LIVE
+                            </span>
+                            {{ end }}
+                            <span class="text-[10px] {{ if eq .Priority " URGENT_ON_AIR" }}bg-red-200 text-red-700{{
+                                else }}bg-slate-100 text-slate-500{{ end }} px-2 py-1 rounded font-bold">
+                                {{ .CreatedAt.Format "15:04" }}
+                            </span>
+                        </div>
                     </div>
-                    <p class="text-xs text-slate-500 mt-1">{{ .Location }} &bull; {{ .Requester.FullName }}</p>
-                    <p class="text-xs text-slate-400 italic mt-1">{{ .Description }}</p>
+
+                    <p class="text-xs {{ if eq .Priority " URGENT_ON_AIR" }}text-red-700{{ else }}text-slate-500{{ end
+                        }} mt-1">
+                        {{ .Location }} &bull; {{ .Requester.FullName }}
+                    </p>
+
+                    <p class="text-xs {{ if eq .Priority " URGENT_ON_AIR" }}text-red-600/80{{ else }}text-slate-400{{
+                        end }} italic mt-1 line-clamp-1">
+                        {{ .Description }}
+                    </p>
                 </div>
                 {{ else }}
-                <div class="text-center text-slate-400 py-4 text-sm bg-white rounded-xl border border-dashed border-slate-200">
+                <div
+                    class="text-center text-slate-400 py-4 text-sm bg-white rounded-xl border border-dashed border-slate-200">
                     <p>Tidak ada tiket aktif.</p>
                 </div>
                 {{ end }}

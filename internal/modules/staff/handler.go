@@ -15,8 +15,12 @@ import (
 )
 
 func History(c *gin.Context) {
-	userIDStr, _ := c.Cookie("user_id")
-	userID, _ := uuid.Parse(userIDStr) 
+	userIDStr, err := c.Cookie("user_id")
+    if err != nil || userIDStr == "" {
+        c.Redirect(http.StatusFound, "/auth/login")
+        return
+    }
+    userID, _ := uuid.Parse(userIDStr)
 
 	var urgentCount int64
 	database.DB.Model(&models.Ticket{}).
@@ -78,9 +82,13 @@ func Dashboard(c *gin.Context) {
 		Order("case when priority = 'URGENT_ON_AIR' then 1 else 2 end, created_at asc").
 		Find(&activeTickets)
 
-	var routineInstances []models.RoutineInstance
-	userIDStr, _ := c.Cookie("user_id")
-	database.DB.Preload("Template").Where("assigned_user_id = ? AND status = 'PENDING'", userIDStr).Find(&routineInstances)
+	userIDStr, err := c.Cookie("user_id")
+    if err != nil || userIDStr == "" {
+        c.Redirect(http.StatusFound, "/auth/login")
+        return
+    }
+var routineInstances []models.RoutineInstance
+    database.DB.Preload("Template").Where("assigned_user_id = ? AND status = 'PENDING'", userIDStr).Find(&routineInstances)
 
 	var user models.User
 	database.DB.First(&user, "id = ?", userIDStr)

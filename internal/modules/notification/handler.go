@@ -26,6 +26,9 @@ func RegisterRoutes(r *gin.Engine) {
 
 	// Endpoint Subscribe (Butuh Login)
 	r.POST("/notifications/subscribe", auth.AuthRequired(), Subscribe)
+	
+	r.POST("/notifications/unsubscribe", auth.AuthRequired(), Unsubscribe)
+	r.POST("/notifications/test", auth.AuthRequired(), SendTestNotification)
 }
 
 type SubscribeRequest struct {
@@ -34,6 +37,25 @@ type SubscribeRequest struct {
 		P256dh string `json:"p256dh"`
 		Auth   string `json:"auth"`
 	} `json:"keys"`
+}
+
+func SendTestNotification(c *gin.Context) {
+    userIDStr, _ := c.Cookie("user_id")
+    userID, _ := uuid.Parse(userIDStr)
+
+   err := notifService.SendNotificationToUser(
+		userID.String(), 
+		"🔔 Test Notifikasi Berhasil!",
+		"Sistem notifikasi Anda berjalan normal.",
+		"/staff/alerts",
+	)
+
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Gagal mengirim notifikasi"})
+        return
+    }
+
+    c.JSON(200, gin.H{"message": "Notifikasi terkirim!"})
 }
 
 func Subscribe(c *gin.Context) {
@@ -76,4 +98,23 @@ func Subscribe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Subscribed successfully"})
+}
+
+// [NEW] Handler Unsubscribe
+func Unsubscribe(c *gin.Context) {
+	var req struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Hapus subscription berdasarkan endpoint (spesifik per device)
+	if err := database.DB.Where("endpoint = ?", req.Endpoint).Delete(&models.PushSubscription{}).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Unsubscribed"})
 }

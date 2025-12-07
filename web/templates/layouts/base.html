@@ -11,31 +11,69 @@
     <meta name="theme-color" content="#2563eb">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906309.png">
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (Gunakan CDN standard untuk development agar lebih stabil) -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- FontAwesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.5"></script>
-    <!-- AlpineJS -->
+
+    <!-- AlpineJS - DITAMBAHKAN "defer" UNTUK MEMPERBAIKI ERROR -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        .slide-up { animation: slideUp 0.4s ease-out; }
-        .hover-scale { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        .hover-scale:hover { transform: scale(1.02); }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .slide-up {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        .hover-scale {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
 <body class="bg-gray-100 text-slate-800">
     {{ template "content" . }}
 
-    <!-- Notification Permission Banner -->
+    <!-- Notification Permission Banner (Hanya muncul jika belum subscribe) -->
     <div id="push-permission-banner"
         class="hidden fixed bottom-0 left-0 w-full bg-blue-600 text-white p-4 z-[9999] shadow-[0_-5px_20px_rgba(0,0,0,0.3)] slide-up pb-8 md:pb-4">
         <div class="max-w-md mx-auto flex justify-between items-center">
@@ -49,9 +87,9 @@
                 </div>
             </div>
             <div class="flex gap-2 shrink-0">
-                <button onclick="dismissPushBanner()"
+                <button onclick="window.NotifSystem.dismissBanner()"
                     class="px-3 py-2 text-xs text-blue-200 hover:text-white font-medium">Nanti</button>
-                <button id="btn-activate-push" onclick="requestPushPermission()"
+                <button id="btn-activate-push" onclick="window.NotifSystem.subscribe()"
                     class="px-4 py-2 bg-white text-blue-600 rounded-lg text-xs font-bold shadow-lg hover:bg-blue-50 transition transform active:scale-95 flex items-center justify-center min-w-[80px]">
                     Aktifkan
                 </button>
@@ -59,135 +97,162 @@
         </div>
     </div>
 
-    <div id="https-warning" class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-2 z-[9999] text-center text-xs font-bold">
+    <div id="https-warning"
+        class="hidden fixed top-0 left-0 w-full bg-red-500 text-white p-2 z-[9999] text-center text-xs font-bold">
         ⚠️ Fitur Notifikasi memerlukan HTTPS (Ngrok) atau Localhost.
     </div>
 
     <script>
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
+        // Global Notification System
+        window.NotifSystem = {
+            urlBase64ToUint8Array: function (base64String) {
+                const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+                const rawData = window.atob(base64);
+                const outputArray = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+                return outputArray;
+            },
 
-        async function getOrRegisterSW() {
-            if (!('serviceWorker' in navigator)) return null;
-            let reg = await navigator.serviceWorker.getRegistration('/');
-            if (!reg) {
+            getRegistration: async function () {
+                if (!('serviceWorker' in navigator)) return null;
+                let reg = await navigator.serviceWorker.getRegistration('/');
+                if (!reg) {
+                    try { reg = await navigator.serviceWorker.register('/sw.js'); }
+                    catch (err) { console.error('[SW] Fail:', err); return null; }
+                }
+                return reg;
+            },
+
+            subscribe: async function (btnId = 'btn-activate-push') {
+                const btn = document.getElementById(btnId);
+                const originalText = btn ? btn.innerHTML : '';
+                if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true; }
+
                 try {
-                    reg = await navigator.serviceWorker.register('/sw.js');
-                    console.log('[SW] New registration successful:', reg.scope);
+                    const reg = await this.getRegistration();
+                    if (!reg) throw new Error("Service Worker Error");
+
+                    const resKey = await fetch('/notifications/vapid-public-key');
+                    if (!resKey.ok) throw new Error("Key Error");
+                    const data = await resKey.json();
+
+                    const sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: this.urlBase64ToUint8Array(data.publicKey)
+                    });
+
+                    const resSub = await fetch('/notifications/subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sub)
+                    });
+
+                    if (!resSub.ok) throw new Error("Backend Save Failed");
+
+                    // Success
+                    localStorage.setItem('push_subscribed_success', 'true');
+                    document.getElementById('push-permission-banner').classList.add('hidden');
+
+                    // Dispatch Event agar halaman Profile bisa update UI
+                    window.dispatchEvent(new CustomEvent('push-subscription-changed', { detail: { active: true } }));
+
+                    alert("Notifikasi Aktif!");
+
                 } catch (err) {
-                    console.error('[SW] Registration failed:', err);
-                    return null;
+                    console.error(err);
+                    alert("Gagal: " + err.message);
+                } finally {
+                    if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
                 }
-            }
-            return reg;
-        }
+            },
 
-        async function requestPushPermission() {
-            const btn = document.getElementById('btn-activate-push');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            unsubscribe: async function (btnId = '') {
+                if (!confirm("Matikan notifikasi di perangkat ini?")) return;
 
-            try {
-                const registration = await getOrRegisterSW();
-                if (!registration) throw new Error("Service Worker gagal dimuat.");
+                const btn = btnId ? document.getElementById(btnId) : null;
+                const original = btn ? btn.innerHTML : '';
+                if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; btn.disabled = true; }
 
-                console.log('[Push] Fetching VAPID Key...');
-                const response = await fetch('/notifications/vapid-public-key', {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                });
-                
-                if (!response.ok) throw new Error("Gagal mengambil kunci server");
-                const data = await response.json();
-                const applicationServerKey = urlBase64ToUint8Array(data.publicKey);
+                try {
+                    const reg = await this.getRegistration();
+                    const sub = await reg.pushManager.getSubscription();
+                    if (sub) {
+                        // Delete from Backend
+                        await fetch('/notifications/unsubscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ endpoint: sub.endpoint })
+                        });
 
-                // Unsubscribe Old
-                const existingSub = await registration.pushManager.getSubscription();
-                if (existingSub) {
-                    console.log('[Push] Removing old sub...');
-                    await existingSub.unsubscribe();
+                        // Unsubscribe from Browser
+                        await sub.unsubscribe();
+                    }
+
+                    localStorage.removeItem('push_subscribed_success');
+                    window.dispatchEvent(new CustomEvent('push-subscription-changed', { detail: { active: false } }));
+                    alert("Notifikasi dimatikan.");
+
+                } catch (e) {
+                    console.error(e);
+                    alert("Gagal mematikan notifikasi.");
+                } finally {
+                    if (btn) { btn.innerHTML = original; btn.disabled = false; }
                 }
+            },
 
-                console.log('[Push] Subscribing new...');
-                const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: applicationServerKey
-                });
+            test: async function (btnId) {
+                const btn = document.getElementById(btnId);
+                const original = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.disabled = true;
 
-                console.log('[Push] Sending to backend...');
-                const resSub = await fetch('/notifications/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-                    body: JSON.stringify(subscription)
-                });
+                try {
+                    const res = await fetch('/notifications/test', { method: 'POST' });
+                    if (!res.ok) throw new Error("Failed");
+                } catch (e) {
+                    alert("Gagal test.");
+                } finally {
+                    btn.innerHTML = original;
+                    btn.disabled = false;
+                }
+            },
 
-                if (!resSub.ok) throw new Error("Backend save failed: " + resSub.status);
-
-                localStorage.setItem('push_subscribed_success', 'true');
+            dismissBanner: function () {
                 document.getElementById('push-permission-banner').classList.add('hidden');
-                
-                // [TEST] Coba kirim notifikasi test lokal
-                registration.showNotification('Notifikasi Aktif!', {
-                    body: 'Sistem notifikasi telah berhasil diaktifkan.',
-                    icon: 'https://cdn-icons-png.flaticon.com/512/906/906309.png'
-                });
+                localStorage.setItem('push_banner_dismissed', 'true');
+            },
 
-                alert('Sukses! Anda akan menerima notifikasi tiket urgent.');
-
-            } catch (err) {
-                console.error('[Push] Error Detail:', err);
-                alert('Gagal: ' + err.message);
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+            checkStatus: async function () {
+                const reg = await this.getRegistration();
+                if (!reg) return false;
+                const sub = await reg.pushManager.getSubscription();
+                return !!sub;
             }
-        }
+        };
 
-        function dismissPushBanner() {
-            document.getElementById('push-permission-banner').classList.add('hidden');
-            localStorage.setItem('push_banner_dismissed', 'true');
-        }
-
+        // On Load Logic
         window.addEventListener('load', async () => {
             if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
                 document.getElementById('https-warning').classList.remove('hidden');
-                return;
             }
 
-            // Cleanup old SW
-            navigator.serviceWorker.getRegistration('/static/sw.js').then(reg => {
-                if (reg) reg.unregister().then(() => window.location.reload());
-            });
+            const isActive = await window.NotifSystem.checkStatus();
 
-            const reg = await getOrRegisterSW();
-            if (reg) {
-                const sub = await reg.pushManager.getSubscription();
+            // Trigger event untuk inisialisasi state di Profile page
+            window.dispatchEvent(new CustomEvent('push-subscription-changed', { detail: { active: isActive } }));
+
+            // Logic Banner (Hanya muncul jika BELUM aktif dan BELUM di-dismiss)
+            if (!isActive) {
                 const isDismissed = localStorage.getItem('push_banner_dismissed') === 'true';
-                const isManualSuccess = localStorage.getItem('push_subscribed_success') === 'true';
-                
-                // Debug Reset via URL ?reset_push=true
-                if (new URLSearchParams(window.location.search).get('reset_push') === 'true') {
-                    if (sub) await sub.unsubscribe();
-                    localStorage.removeItem('push_banner_dismissed');
-                    localStorage.removeItem('push_subscribed_success');
-                    await reg.unregister();
-                    alert('Reset Complete. Reloading...');
-                    window.location.href = window.location.pathname;
-                    return;
-                }
-
-                if (!sub && Notification.permission !== 'denied' && !isDismissed && !isManualSuccess) {
+                if (!isDismissed && Notification.permission !== 'denied') {
                     document.getElementById('push-permission-banner').classList.remove('hidden');
                 }
+            } else {
+                document.getElementById('push-permission-banner').classList.add('hidden');
             }
         });
     </script>
 </body>
+
 </html>
