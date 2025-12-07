@@ -12,6 +12,7 @@ import (
 	"time"
 	"strconv"
 	"fmt"
+	"log"
 	"encoding/json"
 	"it-broadcast-ops/internal/auth"
 )
@@ -177,9 +178,16 @@ func CreateShift(c *gin.Context) {
 		return
 	}
 
+	// [FIX] Menggunakan Timezone Asia/Jakarta agar input 01:00 tetap 01:00 WIB
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		// Fallback jika server tidak punya data timezone (misal: windows/alpine minimal)
+		loc = time.FixedZone("WIB", 7*3600) 
+	}
+
 	layout := "2006-01-02T15:04" // datetime-local format
-	startTime, err1 := time.Parse(layout, startStr)
-	endTime, err2 := time.Parse(layout, endStr)
+	startTime, err1 := time.ParseInLocation(layout, startStr, loc)
+	endTime, err2 := time.ParseInLocation(layout, endStr, loc)
 
 	if err1 != nil || err2 != nil {
 		c.Redirect(http.StatusFound, "/manager?error=InvalidTime")
@@ -465,6 +473,7 @@ func Dashboard(c *gin.Context) {
 	})
 }
 
+
 func ImportSchedule(c *gin.Context) {
 	// 1. Get File
 	file, err := c.FormFile("schedule")
@@ -491,12 +500,22 @@ func ImportSchedule(c *gin.Context) {
 	// 3. Process Records
 	// Format: email, label, start_time, end_time
 	// Time Format: 2006-01-02 15:04
-	layout := "2006-01-02 15:04"
+	layout := "02/01/2006 15:04"
 	var successCount int
 
+	// [FIX] Menggunakan Timezone Asia/Jakarta untuk import juga
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.FixedZone("WIB", 7*3600)
+	}
+
 	for i, record := range records {
-		if i == 0 { continue } // Skip header
-		if len(record) < 4 { continue }
+		if i == 0 {
+			continue
+		} // Skip header
+		if len(record) < 4 {
+			continue
+		}
 
 		email := strings.TrimSpace(record[0])
 		label := strings.TrimSpace(record[1])
@@ -506,13 +525,16 @@ func ImportSchedule(c *gin.Context) {
 		// Find User
 		var user models.User
 		if err := database.DB.Where("email = ?", email).First(&user).Error; err != nil {
-			// Skip if user not found
+			// Skip if user not found or error
+			log.Printf("Import failed for row %d (%s): User not found", i, email)
 			continue
 		}
 
-		startTime, err1 := time.Parse(layout, startStr)
-		endTime, err2 := time.Parse(layout, endStr)
+		// [FIX] Pakai ParseInLocation
+		startTime, err1 := time.ParseInLocation(layout, startStr, loc)
+		endTime, err2 := time.ParseInLocation(layout, endStr, loc)
 		if err1 != nil || err2 != nil {
+			log.Printf("Import failed for row %d: Invalid Time Format. Start: %v, End: %v", i, err1, err2)
 			continue
 		}
 
@@ -523,12 +545,17 @@ func ImportSchedule(c *gin.Context) {
 			EndTime:   endTime,
 			Label:     label,
 		}
-		database.DB.Create(&shift)
-		successCount++
+		if err := database.DB.Create(&shift).Error; err != nil {
+			log.Printf("Import failed for row %d: DB Error %v", i, err)
+		} else {
+			successCount++
+		}
 	}
 
+	log.Printf("Imported %d shifts successfully.", successCount)
 	c.Redirect(http.StatusFound, "/manager")
 }
+
 
 
 // 1. Get Data JSON untuk Modal Edit
