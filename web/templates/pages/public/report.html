@@ -1,0 +1,183 @@
+{{ define "content" }}
+<div class="min-h-screen bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-slate-900 text-white p-6 text-center">
+            <div class="flex items-center justify-center gap-2 mb-2">
+                <i class="fas fa-bolt text-yellow-400 text-2xl"></i>
+                <h1 class="text-xl font-bold">Quick Report</h1>
+            </div>
+            <!-- <p class="text-sm text-slate-300">Lapor masalah tanpa login</p> -->
+        </div>
+
+        <!-- Error Messages -->
+        {{ if .error }}
+        <div class="bg-red-50 text-red-600 p-4 text-sm font-bold border-b border-red-100">
+            <i class="fas fa-exclamation-circle mr-2"></i>{{ .error }}
+        </div>
+        {{ end }}
+
+        {{ if .errors }}
+        <div class="bg-red-50 text-red-600 p-4 text-sm border-b border-red-100">
+            <p class="font-bold mb-2"><i class="fas fa-exclamation-circle mr-2"></i>Mohon perbaiki:</p>
+            <ul class="list-disc list-inside space-y-1">
+                {{ range .errors }}
+                <li>{{ . }}</li>
+                {{ end }}
+            </ul>
+        </div>
+        {{ end }}
+
+        <!-- Form (NO AlpineJS required - pure HTML form) -->
+        <form id="reportForm" action="/report" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
+
+            <!-- Contact Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                        Nama Lengkap <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="name" id="name" required minlength="2"
+                        value="{{ if .form }}{{ index .form " name" }}{{ end }}"
+                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                        placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                        No. Telepon <span class="text-red-500">*</span>
+                    </label>
+                    <input type="tel" name="phone" id="phone" required minlength="10" maxlength="15"
+                        value="{{ if .form }}{{ index .form " phone" }}{{ end }}"
+                        class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                        placeholder="08123456789">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Email <span class="text-red-500">*</span>
+                </label>
+                <input type="email" name="email" id="email" required value="{{ if .form }}{{ index .form " email" }}{{
+                    end }}"
+                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                    placeholder="nama@email.com">
+                <p class="text-xs text-slate-400 mt-1">Untuk menerima update status tiket</p>
+            </div>
+
+            <!-- Location -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Lokasi <span class="text-red-500">*</span>
+                </label>
+                <select name="location" id="location" required
+                    class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none">
+                    <option value="">-- Pilih Lokasi --</option>
+                    <option value="STUDIO_1" {{ if .form }}{{ if eq (index .form "location" ) "STUDIO_1" }}selected{{
+                        end }}{{ end }}>Studio 1 (Live)</option>
+                    <option value="STUDIO_2" {{ if .form }}{{ if eq (index .form "location" ) "STUDIO_2" }}selected{{
+                        end }}{{ end }}>Studio 2</option>
+                    <option value="EDITING_ROOM" {{ if .form }}{{ if eq (index .form "location" ) "EDITING_ROOM"
+                        }}selected{{ end }}{{ end }}>Ruang Editing</option>
+                    <option value="OFFICE" {{ if .form }}{{ if eq (index .form "location" ) "OFFICE" }}selected{{ end
+                        }}{{ end }}>Kantor</option>
+                    <option value="MCR" {{ if .form }}{{ if eq (index .form "location" ) "MCR" }}selected{{ end }}{{ end
+                        }}>Master Control Room</option>
+                    <option value="OTHER" {{ if .form }}{{ if eq (index .form "location" ) "OTHER" }}selected{{ end }}{{
+                        end }}>Lainnya</option>
+                </select>
+            </div>
+
+            <!-- Urgency -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Tingkat Urgensi <span class="text-red-500">*</span>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="urgency" value="NORMAL" class="peer sr-only" checked>
+                        <div
+                            class="p-3 border-2 border-slate-200 rounded-xl text-center hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 transition">
+                            <i class="fas fa-clock mr-1"></i>
+                            <span class="text-sm font-bold">Normal</span>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="urgency" value="ON_AIR_EMERGENCY" class="peer sr-only">
+                        <div
+                            class="p-3 border-2 border-red-200 rounded-xl text-center hover:bg-red-50 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition">
+                            <i class="fas fa-bolt mr-1"></i>
+                            <span class="text-sm font-bold">ON AIR!</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Subject -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Judul Masalah <span class="text-red-500">*</span>
+                </label>
+                <input type="text" name="subject" id="subject" required minlength="5"
+                    value="{{ if .form }}{{ index .form " subject" }}{{ end }}"
+                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                    placeholder="Contoh: Audio tidak keluar di Studio 1">
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Deskripsi <span class="text-red-500">*</span>
+                </label>
+                <textarea name="description" id="description" required minlength="10" rows="3"
+                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                    placeholder="Jelaskan masalah secara detail...">{{ if .form }}{{ index .form "description" }}{{ end }}</textarea>
+            </div>
+
+            <!-- Photo -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    Foto Bukti (Opsional)
+                </label>
+                <input type="file" name="proof_image" accept="image/*"
+                    class="w-full p-2 border border-slate-300 rounded-xl text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-orange-100 file:text-orange-700 file:font-bold file:text-xs hover:file:bg-orange-200 transition">
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" id="submitBtn"
+                class="w-full bg-orange-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-orange-300 hover:bg-orange-700 transition flex items-center justify-center gap-2">
+                <i class="fas fa-paper-plane" id="submitIcon"></i>
+                <span id="submitText">Kirim Laporan</span>
+            </button>
+        </form>
+
+        <!-- Footer -->
+        <div class="bg-slate-50 p-4 text-center border-t border-slate-200">
+            <p class="text-xs text-slate-500">
+                Sudah punya akun? <a href="/auth/login" class="text-blue-600 font-bold hover:underline">Login di
+                    sini</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Simple vanilla JS for loading state (no AlpineJS dependency)
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('reportForm');
+        var btn = document.getElementById('submitBtn');
+        var icon = document.getElementById('submitIcon');
+        var text = document.getElementById('submitText');
+
+        if (form && btn) {
+            form.addEventListener('submit', function (e) {
+                // Don't prevent default - let form submit normally
+                btn.disabled = true;
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+                icon.className = 'fas fa-circle-notch fa-spin';
+                text.textContent = 'Mengirim...';
+            });
+        }
+    });
+</script>
+{{ end }}

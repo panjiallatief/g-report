@@ -12,22 +12,24 @@
         </div>
         {{ end }}
 
-        <form action="/auth/login" method="POST" class="space-y-4">
+        <form id="loginForm" action="/auth/login" method="POST" class="space-y-4">
             <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Email</label>
-                <input type="email" name="email" required
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Email /
+                    Username</label>
+                <input type="text" name="email" id="email" required
                     class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                    placeholder="email@company.com">
+                    placeholder="email@company.com atau username">
             </div>
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Password</label>
-                <input type="password" name="password" required
+                <input type="password" name="password" id="password" required
                     class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
                     placeholder="••••••••">
             </div>
-            <button type="submit"
-                class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition">
-                Login
+            <button type="submit" id="loginBtn"
+                class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                <i class="fas fa-sign-in-alt" id="loginIcon"></i>
+                <span id="loginText">Login</span>
             </button>
         </form>
 
@@ -36,4 +38,22 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('loginForm');
+        var btn = document.getElementById('loginBtn');
+        var icon = document.getElementById('loginIcon');
+        var text = document.getElementById('loginText');
+
+        if (form && btn) {
+            form.addEventListener('submit', function () {
+                btn.disabled = true;
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+                icon.className = 'fas fa-circle-notch fa-spin';
+                text.textContent = 'Logging in...';
+            });
+        }
+    });
+</script>
 {{ end }}

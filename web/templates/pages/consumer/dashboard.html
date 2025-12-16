@@ -4,10 +4,12 @@
         activeTicket: null,
         ticketActivities: [],
         isLoadingTicket: false,
+        eventSource: null,
+        currentUserId: '',
         
         async openTicket(id) {
             this.isLoadingTicket = true;
-            this.activeTicket = null; // Reset
+            this.activeTicket = null;
             document.getElementById('ticket-detail-modal').classList.remove('hidden');
             
             try {
@@ -15,11 +17,56 @@
                 const data = await res.json();
                 this.activeTicket = data.ticket;
                 this.ticketActivities = data.activities;
+                
+                // Get current user ID from cookie
+                this.currentUserId = document.cookie.split('; ').find(row => row.startsWith('user_id='))?.split('=')[1] || '';
+                
+                // Connect to SSE for real-time updates
+                this.connectSSE(id);
             } catch (e) {
                 console.error(e);
             } finally {
                 this.isLoadingTicket = false;
             }
+        },
+        
+        connectSSE(ticketId) {
+            // Close any existing connection
+            if (this.eventSource) {
+                this.eventSource.close();
+            }
+            
+            this.eventSource = new EventSource('/consumer/tickets/' + ticketId + '/stream');
+            
+            this.eventSource.onmessage = (e) => {
+                try {
+                    const newActivity = JSON.parse(e.data);
+                    // Set IsMe based on current user
+                    newActivity.IsMe = (newActivity.ActorID === this.currentUserId);
+                    this.ticketActivities.push(newActivity);
+                    
+                    // Auto-scroll to bottom
+                    this.$nextTick(() => {
+                        const container = document.querySelector('.chat-container');
+                        if (container) container.scrollTop = container.scrollHeight;
+                    });
+                } catch (err) {
+                    console.log('SSE event:', e.data);
+                }
+            };
+            
+            this.eventSource.onerror = () => {
+                console.log('SSE connection error, will retry...');
+            };
+        },
+        
+        closeTicket() {
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+            document.getElementById('ticket-detail-modal').classList.add('hidden');
+            this.activeTicket = null;
         }
     }">
     <!-- Header -->
@@ -141,8 +188,7 @@
     <div id="ticket-detail-modal" class="hidden fixed inset-0 z-[70] bg-white flex flex-col fade-in">
         <!-- Header -->
         <div class="bg-white border-b border-slate-200 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
-            <button onclick="document.getElementById('ticket-detail-modal').classList.add('hidden')"
-                class="text-slate-500 hover:text-slate-800 transition">
+            <button @click="closeTicket()" class="text-slate-500 hover:text-slate-800 transition">
                 <i class="fas fa-arrow-left text-xl"></i>
             </button>
             <div class="flex-1" x-show="!isLoadingTicket">
@@ -161,7 +207,7 @@
         </div>
 
         <!-- Chat & Detail Area -->
-        <div class="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6">
+        <div class="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6 chat-container">
 
             <div x-show="isLoadingTicket" class="flex justify-center py-10">
                 <i class="fas fa-circle-notch fa-spin text-blue-500 text-2xl"></i>
@@ -229,7 +275,8 @@
         <!-- Chat Input Footer -->
         <div class="p-3 border-t border-slate-200 bg-white sticky bottom-0 z-20"
             x-show="activeTicket?.Status !== 'CLOSED'">
-            <form :action="'/consumer/tickets/' + activeTicket?.ID + '/reply'" method="POST" class="relative">
+            <form :action="'/consumer/tickets/' + activeTicket?.ID + '/reply'" method="POST" class="relative"
+                onsubmit="this.querySelector('button').disabled=true; this.querySelector('button i').className='fas fa-circle-notch fa-spin text-xs'">
                 <input type="text" name="message" required placeholder="Tulis balasan..." autocomplete="off"
                     class="w-full pl-4 pr-12 py-3 rounded-full border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm">
                 <button type="submit"
@@ -350,8 +397,9 @@
         </div>
 
         <!-- Form Content -->
-        <form action="/consumer/ticket" method="POST" enctype="multipart/form-data"
-            class="flex-1 overflow-y-auto p-6 space-y-6 bg-white pb-24 sm:pb-6">
+        <form id="createTicketForm" action="/consumer/ticket" method="POST" enctype="multipart/form-data"
+            class="flex-1 overflow-y-auto p-6 space-y-6 bg-white pb-24 sm:pb-6"
+            onsubmit="document.getElementById('createTicketBtn').disabled=true; document.getElementById('createTicketIcon').className='fas fa-circle-notch fa-spin'; document.getElementById('createTicketText').textContent='Mengirim...'">
 
             <!-- 1. Lokasi -->
             <div>
@@ -483,9 +531,10 @@
                     <i class="fas fa-trash mr-1"></i> Hapus Foto
                 </button>
                 <div class="p-4 border-t border-slate-100 bg-white -mx-6 -mb-6">
-                    <button type="submit"
+                    <button type="submit" id="createTicketBtn"
                         class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2">
-                        <i class="fas fa-paper-plane"></i> Kirim Laporan
+                        <i class="fas fa-paper-plane" id="createTicketIcon"></i>
+                        <span id="createTicketText">Kirim Laporan</span>
                     </button>
                 </div>
             </div>

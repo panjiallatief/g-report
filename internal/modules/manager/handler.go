@@ -53,8 +53,10 @@ func RegisterRoutes(r *gin.Engine) {
 func ExportReport(c *gin.Context) {
 	// 1. Set Header agar browser menganggap ini file download
 	filename := fmt.Sprintf("operational_report_%s.csv", time.Now().Format("20060102_1504"))
-	c.Header("Content-Disposition", "attachment; filename="+filename)
-	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	// Add BOM for Excel to recognize UTF-8
+	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	// 2. Inisialisasi CSV Writer
 	writer := csv.NewWriter(c.Writer)
@@ -322,6 +324,67 @@ func Dashboard(c *gin.Context) {
 	}
 	slaMetrics = append(slaMetrics, normalStats)
 
+	// CATEGORY DISTRIBUTION (Pie Chart Data)
+	type CategoryCount struct {
+		Category string
+		Count    int64
+	}
+	var categoryDistribution []CategoryCount
+	database.DB.Model(&models.Ticket{}).
+		Select("category, COUNT(*) as count").
+		Where("created_at >= ?", startDate).
+		Group("category").
+		Scan(&categoryDistribution)
+
+	categoryLabels := []string{}
+	categoryCounts := []int64{}
+	for _, c := range categoryDistribution {
+		label := c.Category
+		if label == "" {
+			label = "Uncategorized"
+		}
+		categoryLabels = append(categoryLabels, label)
+		categoryCounts = append(categoryCounts, c.Count)
+	}
+
+	// PRIORITY DISTRIBUTION (Pie Chart Data)
+	type PriorityCount struct {
+		Priority string
+		Count    int64
+	}
+	var priorityDistribution []PriorityCount
+	database.DB.Model(&models.Ticket{}).
+		Select("priority, COUNT(*) as count").
+		Where("created_at >= ?", startDate).
+		Group("priority").
+		Scan(&priorityDistribution)
+
+	priorityLabels := []string{}
+	priorityCounts := []int64{}
+	for _, p := range priorityDistribution {
+		priorityLabels = append(priorityLabels, string(p.Priority))
+		priorityCounts = append(priorityCounts, p.Count)
+	}
+
+	// STATUS DISTRIBUTION (Pie Chart Data)
+	type StatusCount struct {
+		Status string
+		Count  int64
+	}
+	var statusDistribution []StatusCount
+	database.DB.Model(&models.Ticket{}).
+		Select("status, COUNT(*) as count").
+		Where("created_at >= ?", startDate).
+		Group("status").
+		Scan(&statusDistribution)
+
+	statusLabels := []string{}
+	statusCounts := []int64{}
+	for _, s := range statusDistribution {
+		statusLabels = append(statusLabels, string(s.Status))
+		statusCounts = append(statusCounts, s.Count)
+	}
+
 	// 5. BIG BOOK DATA
 	var articleCount, newArticlesCount int64
 	database.DB.Model(&models.KnowledgeArticle{}).Count(&articleCount)
@@ -415,10 +478,10 @@ func Dashboard(c *gin.Context) {
 	database.DB.Where("role = ?", models.RoleStaff).Find(&staffUsers)
 
 	for _, user := range staffUsers {
-		// Tickets Solved (via Activity or Assignee if available. Using Activity 'RESOLVED' for now)
+		// Tickets Solved - count RESOLVE activities by this user
 		var solvedCount int64
 		database.DB.Model(&models.TicketActivity{}).
-			Where("actor_id = ? AND action_type = ?", user.ID, "RESOLVED").
+			Where("actor_id = ? AND action_type = ?", user.ID, "RESOLVE").
 			Count(&solvedCount)
 		
 		// Big Book Contributions
@@ -427,15 +490,81 @@ func Dashboard(c *gin.Context) {
 			Where("author_id = ?", user.ID).
 			Count(&bbCount)
 
+		// Calculate MTTA for this staff
+		// MTTA = Average time from ticket creation to first response by THIS staff
+		var mttaMinutes *float64
+		database.DB.Raw(`
+			SELECT AVG(EXTRACT(EPOCH FROM (ta.created_at - t.created_at))/60) as mtta_minutes
+			FROM ticket_activities ta
+			JOIN tickets t ON ta.ticket_id = t.id
+			WHERE ta.actor_id = ?
+			AND ta.action_type IN ('REPLY', 'IN_PROGRESS', 'STATUS_CHANGE')
+			AND ta.created_at = (
+				SELECT MIN(ta2.created_at) 
+				FROM ticket_activities ta2 
+				WHERE ta2.ticket_id = t.id 
+				AND ta2.actor_id = ?
+			)
+		`, user.ID, user.ID).Scan(&mttaMinutes)
+
+		mttaStr := "N/A"
+		if mttaMinutes != nil && *mttaMinutes > 0 {
+			if *mttaMinutes < 60 {
+				mttaStr = fmt.Sprintf("%.0fm", *mttaMinutes)
+			} else {
+				mttaStr = fmt.Sprintf("%.1fh", *mttaMinutes/60)
+			}
+		}
+
+		// Calculate MTTR for this staff
+		// MTTR = Average time from ticket creation to resolution for tickets resolved by THIS staff
+		var mttrMinutes *float64
+		database.DB.Raw(`
+			SELECT AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at))/60) as mttr_minutes
+			FROM tickets t
+			JOIN ticket_activities ta ON ta.ticket_id = t.id
+			WHERE ta.actor_id = ?
+			AND ta.action_type = 'RESOLVE'
+			AND t.resolved_at IS NOT NULL
+		`, user.ID).Scan(&mttrMinutes)
+
+		mttrStr := "N/A"
+		if mttrMinutes != nil && *mttrMinutes > 0 {
+			if *mttrMinutes < 60 {
+				mttrStr = fmt.Sprintf("%.0fm", *mttrMinutes)
+			} else {
+				mttrStr = fmt.Sprintf("%.1fh", *mttrMinutes/60)
+			}
+		}
+
+		// Rating calculation - based on performance metrics
+		// Simple formula: Base 3.0 + bonuses for good metrics
+		rating := 3.0
+		if solvedCount > 0 {
+			rating += 0.5 // Bonus for having solved tickets
+		}
+		if solvedCount >= 10 {
+			rating += 0.5 // Bonus for solving 10+ tickets
+		}
+		if bbCount > 0 {
+			rating += 0.5 // Bonus for Big Book contributions
+		}
+		if mttaMinutes != nil && *mttaMinutes < 15 {
+			rating += 0.5 // Bonus for fast response
+		}
+		if rating > 5.0 {
+			rating = 5.0 // Cap at 5.0
+		}
+
 		staffPerformance = append(staffPerformance, StaffStat{
 			StaffName:     user.FullName,
 			AvatarURL:     user.AvatarURL,
-			Role:          "IT Support", // Static for now
+			Role:          "IT Support",
 			TicketsSolved: solvedCount,
-			MTTA:          "N/A", // Complex calc skipped for MVP
-			MTTR:          "N/A", // Complex calc skipped for MVP
+			MTTA:          mttaStr,
+			MTTR:          mttrStr,
 			BigBookContrib: bbCount,
-			Rating:        4.5, // Mock rating
+			Rating:        rating,
 		})
 	}
 	
@@ -467,9 +596,13 @@ func Dashboard(c *gin.Context) {
 		"allStaff":          allStaff,
 		"slaMetrics":        slaMetrics,
 		"routineTemplates":  routineTemplates,
-
-		
-		
+		// Pie Chart Data
+		"categoryLabels":  categoryLabels,
+		"categoryCounts":  categoryCounts,
+		"priorityLabels":  priorityLabels,
+		"priorityCounts":  priorityCounts,
+		"statusLabels":    statusLabels,
+		"statusCounts":    statusCounts,
 	})
 }
 

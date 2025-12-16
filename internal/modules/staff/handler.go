@@ -3,10 +3,12 @@ package staff
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"path/filepath"
 	"it-broadcast-ops/internal/auth"
 	"it-broadcast-ops/internal/database"
 	"it-broadcast-ops/internal/models"
+	redisClient "it-broadcast-ops/internal/redis"
 	"net/http"
 	"time"
 
@@ -437,7 +439,11 @@ func ReplyTicket(c *gin.Context) {
 	userIDStr, _ := c.Cookie("user_id")
 	userID, _ := uuid.Parse(userIDStr)
 
-	// 1. Simpan Activity (Chat)
+	// Get user info for the activity view
+	var user models.User
+	database.DB.First(&user, "id = ?", userID)
+
+	// 1. Save Activity (Chat)
 	activity := models.TicketActivity{
 		TicketID:   uuid.MustParse(id),
 		ActorID:    userID,
@@ -447,8 +453,22 @@ func ReplyTicket(c *gin.Context) {
 	}
 	database.DB.Create(&activity)
 
-	// 2. Auto-update status: Jika masih OPEN -> Ubah jadi IN_PROGRESS
-	// Logika: Jika teknisi membalas, berarti tiket sedang dikerjakan (MTTA stop)
+	// 2. Publish to Redis for real-time updates
+	if redisClient.IsConnected() {
+		activityView := map[string]interface{}{
+			"ActorName":   user.FullName,
+			"ActorAvatar": user.AvatarURL,
+			"ActionType":  "REPLY",
+			"Note":        message,
+			"Time":        activity.CreatedAt.Format("02 Jan 15:04"),
+			"IsMe":        false, // Determined client-side
+			"ActorID":     userID.String(),
+		}
+		redisClient.Publish("chat:"+id, activityView)
+		log.Println("[Redis] Staff published chat message for ticket:", id)
+	}
+
+	// 3. Auto-update status: If still OPEN -> Change to IN_PROGRESS
 	var ticket models.Ticket
 	database.DB.First(&ticket, "id = ?", id)
 	

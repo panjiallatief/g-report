@@ -74,7 +74,7 @@ func (j *JSONB) Scan(value interface{}) error {
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Email        string    `gorm:"unique;not null"`
-	PasswordHash string    `gorm:"not null"`
+	PasswordHash string    // Nullable for LDAP users
 	FullName     string    `gorm:"not null"`
 	Role         UserRole  `gorm:"type:user_role;default:'CONSUMER'"`
 	AvatarURL    string

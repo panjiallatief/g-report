@@ -1,0 +1,83 @@
+{{ define "content" }}
+<div class="min-h-screen bg-slate-900 flex items-center justify-center p-8">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-8 text-center">
+            <h1 class="text-2xl font-bold mb-2">QR Code - Quick Report</h1>
+            <p class="text-blue-100 text-sm">Scan untuk lapor masalah tanpa login</p>
+        </div>
+
+        <!-- QR Code -->
+        <div class="p-12 text-center">
+            <div class="bg-white p-6 rounded-2xl shadow-lg inline-block border-4 border-slate-200">
+                <!-- QR Code generated via API -->
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={{ .formURL }}" alt="QR Code"
+                    class="w-64 h-64 mx-auto">
+            </div>
+
+            <p class="mt-6 text-sm text-slate-500">
+                <i class="fas fa-link mr-1"></i>
+                <span class="font-mono bg-slate-100 px-2 py-1 rounded">{{ .formURL }}</span>
+            </p>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-slate-50 p-6 border-t border-slate-200">
+            <h3 class="font-bold text-slate-700 mb-4 text-center">Cara Penggunaan</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="p-4">
+                    <div class="w-12 h-12 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-print text-blue-600"></i>
+                    </div>
+                    <p class="text-sm text-slate-600">Print dan tempel di lokasi strategis</p>
+                </div>
+                <div class="p-4">
+                    <div class="w-12 h-12 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-mobile-alt text-green-600"></i>
+                    </div>
+                    <p class="text-sm text-slate-600">Scan dengan kamera HP</p>
+                </div>
+                <div class="p-4">
+                    <div class="w-12 h-12 mx-auto bg-orange-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fas fa-paper-plane text-orange-600"></i>
+                    </div>
+                    <p class="text-sm text-slate-600">Isi form dan kirim langsung</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Print Button -->
+        <div class="p-6 text-center">
+            <button onclick="window.print()"
+                class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-black transition">
+                <i class="fas fa-print mr-2"></i> Print QR Code
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        .bg-white.max-w-2xl,
+        .bg-white.max-w-2xl * {
+            visibility: visible;
+        }
+
+        .bg-white.max-w-2xl {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+
+        button {
+            display: none !important;
+        }
+    }
+</style>
+{{ end }}

@@ -122,7 +122,8 @@
     <!-- Chat Input (Hanya jika belum resolved/closed) -->
     {{ if and (ne .ticket.Status "RESOLVED") (ne .ticket.Status "CLOSED") }}
     <div class="sticky bottom-0 bg-slate-50 pt-2 pb-4 px-4 z-10 border-t border-slate-100">
-        <form action="/staff/tickets/{{ .ticket.ID }}/reply" method="POST" class="relative shadow-sm">
+        <form action="/staff/tickets/{{ .ticket.ID }}/reply" method="POST" class="relative shadow-sm"
+            onsubmit="this.querySelector('button').disabled=true; this.querySelector('button i').className='fas fa-circle-notch fa-spin text-xs'">
             <input type="text" name="message" required placeholder="Tulis balasan / update..." autocomplete="off"
                 class="w-full pl-4 pr-12 py-3 rounded-full border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white">
             <button type="submit"
@@ -171,7 +172,8 @@
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <form action="/staff/tickets/{{ .ticket.ID }}/resolve" method="POST" class="p-6 space-y-4">
+                    <form action="/staff/tickets/{{ .ticket.ID }}/resolve" method="POST" class="p-6 space-y-4"
+                        onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-circle-notch fa-spin mr-2\'></i>Menyimpan...'">
                         <div>
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Solusi
                                 Perbaikan (Wajib)</label>
@@ -201,7 +203,8 @@
                         class="fas fa-times"></i></button>
             </div>
 
-            <form action="/staff/tickets/{{ .ticket.ID }}/handover" method="POST" class="space-y-4">
+            <form action="/staff/tickets/{{ .ticket.ID }}/handover" method="POST" class="space-y-4"
+                onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').innerHTML='<i class=\'fas fa-circle-notch fa-spin mr-2\'></i>Memproses...'">
                 <div>
                     <label class="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-2">Catatan Handover
                         (Wajib)</label>

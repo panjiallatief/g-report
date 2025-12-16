@@ -1,10 +1,13 @@
 package consumer
 
 import (
+	"io"
 	"it-broadcast-ops/internal/auth"
 	"it-broadcast-ops/internal/database"
 	"it-broadcast-ops/internal/models"
 	"it-broadcast-ops/internal/notification"
+	redisClient "it-broadcast-ops/internal/redis"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,9 +26,10 @@ func RegisterRoutes(r *gin.Engine) {
 		consumerGroup.GET("/articles/:id", ArticleDetail)
 		consumerGroup.POST("/ticket", CreateTicket)
 
-		// New Endpoints for Ticket Chat
+		// Endpoints for Ticket Chat
 		consumerGroup.GET("/tickets/:id/details", GetTicketDetailJSON)
 		consumerGroup.POST("/tickets/:id/reply", ReplyTicket)
+		consumerGroup.GET("/tickets/:id/stream", TicketChatStream) // SSE for real-time
 	}
 }
 
@@ -47,23 +51,37 @@ func Dashboard(c *gin.Context) {
 	})
 }
 
-// SearchBigBook updated to return alphabetical list if query is empty
+// SearchBigBook updated with Redis caching
 func SearchBigBook(c *gin.Context) {
 	query := c.Query("q")
-	var articles []models.KnowledgeArticle
+	cacheKey := "cache:bigbook:" + query
 	
+	// Try cache first (if Redis is connected)
+	var articles []models.KnowledgeArticle
+	if redisClient.IsConnected() {
+		if err := redisClient.Get(cacheKey, &articles); err == nil {
+			log.Println("[Cache] HIT for bigbook:", query)
+			c.JSON(200, articles)
+			return
+		}
+		log.Println("[Cache] MISS for bigbook:", query)
+	}
+	
+	// Cache miss or Redis unavailable - query database
 	db := database.DB.Model(&models.KnowledgeArticle{}).Where("is_verified = ?", true)
 
 	if query != "" {
-		// Jika ada search, cari berdasarkan judul atau konten
 		db = db.Where("title ILIKE ? OR content ILIKE ?", "%"+query+"%", "%"+query+"%")
 	} else {
-		// Jika kosong, urutkan A-Z (Alphabetical)
 		db = db.Order("title ASC")
 	}
 
-	// Limit results to keep payload light
 	db.Limit(50).Find(&articles)
+	
+	// Store in cache (5 minutes TTL)
+	if redisClient.IsConnected() {
+		redisClient.Set(cacheKey, articles, 5*time.Minute)
+	}
 	
 	c.JSON(200, articles)
 }
@@ -226,7 +244,7 @@ func GetTicketDetailJSON(c *gin.Context) {
 	})
 }
 
-// NEW: Reply to Ticket (Consumer Side)
+// Reply to Ticket (Consumer Side) with Redis Pub/Sub
 func ReplyTicket(c *gin.Context) {
 	id := c.Param("id")
 	message := c.PostForm("message")
@@ -238,6 +256,10 @@ func ReplyTicket(c *gin.Context) {
 		return
 	}
 
+	// Get user info for the activity view
+	var user models.User
+	database.DB.First(&user, "id = ?", userID)
+
 	activity := models.TicketActivity{
 		TicketID:   uuid.MustParse(id),
 		ActorID:    userID,
@@ -247,8 +269,67 @@ func ReplyTicket(c *gin.Context) {
 	}
 	database.DB.Create(&activity)
 
-	// Jika tiket sudah resolved tapi user membalas, mungkin perlu di-reopen?
-	// Untuk sekarang biarkan statusnya tetap, notifikasi akan masuk ke staff.
-	
+	// Publish to Redis for real-time updates
+	if redisClient.IsConnected() {
+		activityView := map[string]interface{}{
+			"ActorName":   user.FullName,
+			"ActorAvatar": user.AvatarURL,
+			"ActionType":  "REPLY",
+			"Note":        message,
+			"Time":        activity.CreatedAt.Format("02 Jan 15:04"),
+			"IsMe":        false, // Will be determined client-side
+			"ActorID":     userID.String(),
+		}
+		redisClient.Publish("chat:"+id, activityView)
+		log.Println("[Redis] Published chat message for ticket:", id)
+	}
+
 	c.Redirect(http.StatusFound, "/consumer")
+}
+
+// TicketChatStream provides Server-Sent Events for real-time chat
+func TicketChatStream(c *gin.Context) {
+	tickemID := c.Param("id")
+
+	// Set SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	// Check if Redis is available
+	if !redisClient.IsConnected() {
+		c.SSEvent("error", "Redis not available")
+		return
+	}
+
+	// Subscribe to ticket channel
+	sub := redisClient.Subscribe("chat:" + tickemID)
+	defer sub.Close()
+
+	ch := sub.Channel()
+
+	// Send initial connection event
+	c.SSEvent("connected", "Listening for chat updates")
+	c.Writer.Flush()
+
+	// Listen for messages
+	for {
+		select {
+		case msg := <-ch:
+			c.SSEvent("message", msg.Payload)
+			c.Writer.Flush()
+		case <-c.Request.Context().Done():
+			// Client disconnected
+			log.Println("[SSE] Client disconnected from ticket:", tickemID)
+			return
+		case <-time.After(30 * time.Second):
+			// Send heartbeat to keep connection alive
+			c.SSEvent("heartbeat", "ping")
+			if _, err := io.WriteString(c.Writer, ""); err != nil {
+				return
+			}
+			c.Writer.Flush()
+		}
+	}
 }

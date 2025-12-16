@@ -3,6 +3,8 @@
         // State untuk Modal Review (Approval Queue)
         reviewModalOpen: false, 
         reviewArticle: { id: '', title: '', author: '', category: '', content: '', type: '' },
+        isApproving: false,
+        isDenying: false,
         
         // State untuk Modal Artikel (View/Edit/New)
         modals: { new: false, view: false, edit: false },
@@ -15,6 +17,8 @@
         // --- Fungsi Review (Approval Queue) ---
         openReview(id, title, author, category, content, type) {
             this.reviewArticle = { id, title, author, category, content, type };
+            this.isApproving = false;
+            this.isDenying = false;
             this.reviewModalOpen = true;
         },
 
@@ -32,16 +36,23 @@
             return '/manager/articles/' + this.reviewArticle.id + '/deny';
         },
 
+        handleApprove(e) {
+            this.isApproving = true;
+        },
+
         confirmDeny(e) {
             if (this.reviewArticle.type === 'ticket') {
                 if (!confirm('Abaikan saran tiket ini? (Akan hilang dari daftar shortcut)')) {
                     e.preventDefault();
+                    return;
                 }
             } else {
                 if (!confirm('Tolak dan hapus draft artikel ini secara permanen?')) {
                     e.preventDefault();
+                    return;
                 }
             }
+            this.isDenying = true;
         },
 
         // --- Fungsi Artikel (Published List) ---
@@ -194,20 +205,115 @@
 
                     </div>
 
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                                <i class="fas fa-chart-line text-blue-500"></i> Weekly Ticket Trend
-                            </h3>
-                            <div class="flex gap-2">
-                                <span class="text-xs flex items-center gap-1"><span
-                                        class="w-3 h-3 bg-blue-500 rounded-full"></span> Incoming</span>
-                                <span class="text-xs flex items-center gap-1"><span
-                                        class="w-3 h-3 bg-green-500 rounded-full"></span> Resolved</span>
+                    <!-- Charts Row: Weekly Trend + Analytics -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <!-- Weekly Ticket Trend -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                    <i class="fas fa-chart-line text-blue-500"></i> Weekly Trend
+                                </h3>
+                                <div class="flex gap-2">
+                                    <span class="text-xs flex items-center gap-1"><span
+                                            class="w-3 h-3 bg-blue-500 rounded-full"></span> Incoming</span>
+                                    <span class="text-xs flex items-center gap-1"><span
+                                            class="w-3 h-3 bg-green-500 rounded-full"></span> Resolved</span>
+                                </div>
+                            </div>
+                            <div class="h-56 w-full">
+                                <canvas id="kpiChart"></canvas>
                             </div>
                         </div>
-                        <div class="h-64 w-full">
-                            <canvas id="kpiChart"></canvas>
+
+                        <!-- Analytics Charts Section with Tab Selector -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"
+                            x-data="{ activeChart: 'category' }">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                    <i class="fas fa-chart-pie text-purple-500"></i> Analytics
+                                </h3>
+                                <!-- Chart Type Selector -->
+                                <div class="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                                    <button @click="activeChart = 'category'"
+                                        :class="activeChart === 'category' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'"
+                                        class="px-2 py-1 rounded-md text-xs font-bold transition">
+                                        Category
+                                    </button>
+                                    <button @click="activeChart = 'priority'"
+                                        :class="activeChart === 'priority' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'"
+                                        class="px-2 py-1 rounded-md text-xs font-bold transition">
+                                        Priority
+                                    </button>
+                                    <button @click="activeChart = 'status'"
+                                        :class="activeChart === 'status' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'"
+                                        class="px-2 py-1 rounded-md text-xs font-bold transition">
+                                        Status
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <!-- Pie/Doughnut Chart -->
+                                <div class="h-56 w-1/2 flex items-center justify-center">
+                                    <canvas id="categoryChart" x-show="activeChart === 'category'"></canvas>
+                                    <canvas id="priorityChart" x-show="activeChart === 'priority'"></canvas>
+                                    <canvas id="statusChart" x-show="activeChart === 'status'"></canvas>
+                                </div>
+                                <!-- Legend / Stats -->
+                                <div class="w-1/2 flex flex-col justify-center text-sm">
+                                    <!-- Category Legend -->
+                                    <div x-show="activeChart === 'category'" class="space-y-2">
+                                        {{ range $i, $label := .categoryLabels }}
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2.5 h-2.5 rounded-full"
+                                                    style="background-color: {{ if eq $i 0 }}#3b82f6{{ else if eq $i 1 }}#22c55e{{ else if eq $i 2 }}#eab308{{ else if eq $i 3 }}#f97316{{ else }}#8b5cf6{{ end }}"></span>
+                                                <span class="text-slate-600 text-xs">{{ $label }}</span>
+                                            </div>
+                                            <span class="font-bold text-slate-800">{{ index $.categoryCounts $i
+                                                }}</span>
+                                        </div>
+                                        {{ else }}
+                                        <p class="text-slate-400 italic text-xs">No data</p>
+                                        {{ end }}
+                                    </div>
+                                    <!-- Priority Legend -->
+                                    <div x-show="activeChart === 'priority'" class="space-y-2">
+                                        {{ range $i, $label := .priorityLabels }}
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2.5 h-2.5 rounded-full"
+                                                    style="background-color: {{ if eq $label " URGENT_ON_AIR"
+                                                    }}#ef4444{{ else if eq $label "HIGH" }}#f97316{{ else }}#22c55e{{
+                                                    end }}"></span>
+                                                <span class="text-slate-600 text-xs">{{ $label }}</span>
+                                            </div>
+                                            <span class="font-bold text-slate-800">{{ index $.priorityCounts $i
+                                                }}</span>
+                                        </div>
+                                        {{ else }}
+                                        <p class="text-slate-400 italic text-xs">No data</p>
+                                        {{ end }}
+                                    </div>
+                                    <!-- Status Legend -->
+                                    <div x-show="activeChart === 'status'" class="space-y-2">
+                                        {{ range $i, $label := .statusLabels }}
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2.5 h-2.5 rounded-full"
+                                                    style="background-color: {{ if eq $label " OPEN" }}#3b82f6{{ else if
+                                                    eq $label "IN_PROGRESS" }}#eab308{{ else if eq $label "RESOLVED"
+                                                    }}#22c55e{{ else if eq $label "CLOSED" }}#6b7280{{ else }}#8b5cf6{{
+                                                    end }}"></span>
+                                                <span class="text-slate-600 text-xs">{{ $label }}</span>
+                                            </div>
+                                            <span class="font-bold text-slate-800">{{ index $.statusCounts $i }}</span>
+                                        </div>
+                                        {{ else }}
+                                        <p class="text-slate-400 italic text-xs">No data</p>
+                                        {{ end }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -953,21 +1059,23 @@
                         <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-3">
 
                             <!-- DENY FORM -->
-                            <form :action="getDenyAction()" method="POST" @submit="confirmDeny">
-
+                            <form :action="getDenyAction()" method="POST"
+                                onsubmit="if(!confirm(this.querySelector('[data-type]')?.dataset.type === 'ticket' ? 'Abaikan saran tiket ini?' : 'Tolak dan hapus draft?')) return false; this.querySelector('button').disabled=true; this.querySelector('button i').className='fas fa-circle-notch fa-spin'; this.querySelector('button span').textContent='Processing...'">
                                 <button type="submit"
                                     class="px-4 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition flex items-center gap-2">
                                     <i class="fas fa-times"></i>
-                                    <span
-                                        x-text="reviewArticle.type === 'ticket' ? 'Ignore / Remove' : 'Deny & Delete'"></span>
+                                    <span x-text="reviewArticle.type === 'ticket' ? 'Ignore / Remove' : 'Deny & Delete'"
+                                        :data-type="reviewArticle.type"></span>
                                 </button>
                             </form>
 
                             <!-- APPROVE FORM -->
-                            <form :action="getApproveAction()" method="POST">
+                            <form :action="getApproveAction()" method="POST"
+                                onsubmit="this.querySelector('button').disabled=true; this.querySelector('button i').className='fas fa-circle-notch fa-spin'; this.querySelector('button span').textContent='Processing...'">
                                 <button type="submit"
                                     class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition flex items-center gap-2">
-                                    <i class="fas fa-check"></i> <span
+                                    <i class="fas fa-check"></i>
+                                    <span
                                         x-text="reviewArticle.type === 'ticket' ? 'Convert to Article' : 'Approve & Publish'"></span>
                                 </button>
                             </form>
@@ -1142,6 +1250,97 @@
             }
         }
     });
+
+    // PIE CHARTS DATA
+    const categoryLabels = {{ .categoryLabels }};
+    const categoryCounts = {{ .categoryCounts }};
+    const priorityLabels = {{ .priorityLabels }};
+    const priorityCounts = {{ .priorityCounts }};
+    const statusLabels = {{ .statusLabels }};
+    const statusCounts = {{ .statusCounts }};
+
+    // Category Chart (Doughnut)
+    if (categoryLabels && categoryLabels.length > 0) {
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        new Chart(categoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: categoryLabels,
+                datasets: [{
+                    data: categoryCounts,
+                    backgroundColor: ['#3b82f6', '#22c55e', '#eab308', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6'],
+                    borderWidth: 0,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // Priority Chart (Doughnut)
+    if (priorityLabels && priorityLabels.length > 0) {
+        const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+        new Chart(priorityCtx, {
+            type: 'doughnut',
+            data: {
+                labels: priorityLabels,
+                datasets: [{
+                    data: priorityCounts,
+                    backgroundColor: priorityLabels.map(l =>
+                        l === 'URGENT_ON_AIR' ? '#ef4444' :
+                            l === 'HIGH' ? '#f97316' : '#22c55e'
+                    ),
+                    borderWidth: 0,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // Status Chart (Doughnut)
+    if (statusLabels && statusLabels.length > 0) {
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: statusLabels,
+                datasets: [{
+                    data: statusCounts,
+                    backgroundColor: statusLabels.map(l =>
+                        l === 'OPEN' ? '#3b82f6' :
+                            l === 'IN_PROGRESS' ? '#eab308' :
+                                l === 'RESOLVED' ? '#22c55e' :
+                                    l === 'CLOSED' ? '#6b7280' : '#8b5cf6'
+                    ),
+                    borderWidth: 0,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '60%'
+            }
+        });
+    }
     function switchManagerTab(tabName) {
         // Hide all manager content
         ['dashboard', 'shifts', 'bigbook', 'performance', 'routines'].forEach(t => {

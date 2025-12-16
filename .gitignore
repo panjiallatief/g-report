@@ -30,3 +30,7 @@ node_modules/
 
 # Logs
 *.log
+
+# SSL Certificates (generated locally)
+server.crt
+server.key

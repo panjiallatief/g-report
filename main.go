@@ -6,6 +6,7 @@ import (
 	
 	"github.com/joho/godotenv"
 	"it-broadcast-ops/internal/database"
+	redisClient "it-broadcast-ops/internal/redis"
 	"it-broadcast-ops/internal/server"
 )
 
@@ -17,6 +18,11 @@ func main() {
 
 	// Connect to Database
 	database.Connect()
+
+	// Connect to Redis (optional - app works without it)
+	if err := redisClient.Init(); err != nil {
+		log.Println("⚠️  Redis not available. Chat will use polling instead of real-time.")
+	}
 
 	// Setup Router
 	r := server.NewRouter()
