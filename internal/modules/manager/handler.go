@@ -529,9 +529,17 @@ func Dashboard(c *gin.Context) {
 			statusClass = "bg-slate-100 text-slate-500"
 		}
 		
+		// [FIX] Convert UTC times to WIB (Asia/Jakarta) for display
+		loc, err := time.LoadLocation("Asia/Jakarta")
+		if err != nil {
+			loc = time.FixedZone("WIB", 7*3600) // Fallback if timezone data unavailable
+		}
+		startTimeWIB := shift.StartTime.In(loc)
+		endTimeWIB := shift.EndTime.In(loc)
+		
 		upcomingShifts = append(upcomingShifts, ShiftView{
-			DateStr:     shift.StartTime.Format("Mon, 02 Jan"),
-			TimeStr:     shift.StartTime.Format("15:04") + " - " + shift.EndTime.Format("15:04"),
+			DateStr:     startTimeWIB.Format("Mon, 02 Jan"),
+			TimeStr:     startTimeWIB.Format("15:04") + " - " + endTimeWIB.Format("15:04"),
 			StaffName:   shift.User.FullName,
 			Label:       shift.Label,
 			AvatarURL:   shift.User.AvatarURL,
