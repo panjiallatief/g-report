@@ -39,6 +39,15 @@ type SubscribeRequest struct {
 	} `json:"keys"`
 }
 
+// SendTestNotification godoc
+// @Summary      Send test notification
+// @Description  Send a test push notification to current user
+// @Tags         Notifications
+// @Produce      json
+// @Security     CookieAuth
+// @Success      200  {object}  object  "Notification sent"
+// @Failure      500  {object}  object  "Failed to send"
+// @Router       /notifications/test [post]
 func SendTestNotification(c *gin.Context) {
     userIDStr, _ := c.Cookie("user_id")
     userID, _ := uuid.Parse(userIDStr)
@@ -58,6 +67,17 @@ func SendTestNotification(c *gin.Context) {
     c.JSON(200, gin.H{"message": "Notifikasi terkirim!"})
 }
 
+// Subscribe godoc
+// @Summary      Subscribe to push notifications
+// @Description  Register push notification subscription
+// @Tags         Notifications
+// @Accept       json
+// @Produce      json
+// @Security     CookieAuth
+// @Param        subscription  body  notification.SubscribeRequest  true  "Push subscription"
+// @Success      201  {object}  object  "Subscribed successfully"
+// @Failure      400  {object}  object  "Invalid request"
+// @Router       /notifications/subscribe [post]
 func Subscribe(c *gin.Context) {
 	var req SubscribeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -100,7 +120,17 @@ func Subscribe(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Subscribed successfully"})
 }
 
-// [NEW] Handler Unsubscribe
+// Unsubscribe godoc
+// @Summary      Unsubscribe from push notifications
+// @Description  Remove push notification subscription
+// @Tags         Notifications
+// @Accept       json
+// @Produce      json
+// @Security     CookieAuth
+// @Param        subscription  body  object  true  "Subscription endpoint"
+// @Success      200  {object}  object  "Unsubscribed"
+// @Failure      400  {object}  object  "Invalid request"
+// @Router       /notifications/unsubscribe [post]
 func Unsubscribe(c *gin.Context) {
 	var req struct {
 		Endpoint string `json:"endpoint"`

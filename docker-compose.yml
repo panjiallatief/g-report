@@ -1,26 +1,59 @@
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: it_ops_db
+  app:
+    image: panjiallatief/goreport:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goreport_app
     restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:5432"
+      - "${PORT:-8086}:8080"
+    environment:
+      # Database - Use host.docker.internal to connect to host machine's database
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT:-5432}
+      # Redis - Using containerized Redis
+      - REDIS_URL=redis:6379
+      # Application
+      - PORT=8080
+      - SERVER_IP=${SERVER_IP:-}
+      - DISABLE_HTTPS=${DISABLE_HTTPS:-false}
+      - SESSION_SECRET=${SESSION_SECRET}
+      # LDAP (Optional)
+      - LDAP_URL=${LDAP_URL:-}
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-}
+      - LDAP_BASE_DN=${LDAP_BASE_DN:-}
+      # Push Notifications (Optional)
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./internal/models/schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./web/uploads:/app/web/uploads
+      - ./cert:/app/cert
+      - ./certs:/app/certs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    networks:
+      - goreport_network
+
   redis:
-    image: redis/redis-stack:latest
-    container_name: it_ops_redis
+    image: redis:7-alpine
+    container_name: goreport_redis
     restart: always
     ports:
       - "6379:6379"
-      - "8001:8001"
     volumes:
       - redis_data:/data
+    networks:
+      - goreport_network
+
+networks:
+  goreport_network:
+    driver: bridge
+
 volumes:
-  postgres_data:
   redis_data:

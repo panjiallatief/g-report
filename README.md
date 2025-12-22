@@ -68,12 +68,69 @@ G-Report is a comprehensive IT Operations and Helpdesk management system designe
    ```
    The application will start at `http://localhost:8080`.
 
-### Method 2: Docker
+### Method 2: Docker (Recommended for Production)
 
-1. **Build and Run**
-   ```bash
-   docker-compose up --build
-   ```
+#### Option A: Pull from Docker Hub
+```bash
+# Pull the latest image
+docker pull panjiallatief/goreport:latest
+
+# Run with docker-compose
+docker-compose up -d
+```
+
+#### Option B: Build Locally
+```bash
+# Build and run all services
+docker-compose up --build -d
+```
+
+#### Docker Environment Variables
+Create a `.env` file in the project root:
+```env
+# Database
+DB_USER=postgres
+DB_PASSWORD=yourpassword
+DB_NAME=it_broadcast_db
+DB_PORT=5432
+
+# Application
+PORT=8080
+SESSION_SECRET=your_secret_key
+
+# LDAP (Optional)
+LDAP_ENABLED=false
+LDAP_SERVER=ldap.example.com
+LDAP_PORT=389
+LDAP_BASE_DN=dc=example,dc=com
+LDAP_BIND_DN=cn=admin,dc=example,dc=com
+LDAP_BIND_PASSWORD=admin_password
+
+# Push Notifications (Optional)
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+```
+
+#### Docker Commands
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop all services
+docker-compose down
+
+# Rebuild and restart
+docker-compose up --build -d
+```
+
+#### Docker Hub Image
+- **Repository**: `panjiallatief/goreport`
+- **Tag**: `latest`
+- **Pull**: `docker pull panjiallatief/goreport:latest`
+
 
 ## 📂 Project Structure
 
@@ -104,6 +161,31 @@ G-Report is a comprehensive IT Operations and Helpdesk management system designe
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+## 📚 API Documentation
+
+This project uses **Swagger** for interactive API documentation.
+
+### Access Swagger UI
+After running the application, access the API documentation at:
+```
+http://localhost:8080/swagger/index.html
+```
+
+### Available Endpoints
+The API is organized into the following groups:
+- **Auth** - Login, logout endpoints
+- **Public** - Anonymous ticket submission (no auth required)
+- **Consumer** - Employee dashboard, ticket creation, knowledge base
+- **Staff** - IT staff dashboard, ticket management, routines
+- **Manager** - Management dashboard, KPIs, shift scheduling, article approval
+- **Notifications** - Push notification subscription management
+
+### Regenerate Docs
+If you modify API annotations, regenerate the docs:
+```bash
+swag init
+```
 
 ## 🧪 Testing Strategy & Report
 

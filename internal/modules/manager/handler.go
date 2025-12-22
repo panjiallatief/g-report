@@ -49,10 +49,34 @@ func RegisterRoutes(r *gin.Engine) {
 		managerGroup.POST("/tickets/:id/deny", DenyTicket) 
 	}
 }
-// [NEW] Handler untuk Download Report Tiket ke CSV (Excel Compatible)
+// ExportReport godoc
+// @Summary      Export tickets report
+// @Description  Download tickets report as CSV file
+// @Tags         Manager
+// @Produce      text/csv
+// @Security     CookieAuth
+// @Param        month  query  string  false  "Month filter (YYYY-MM)"
+// @Success      200  {file}  file  "CSV file download"
+// @Router       /manager/reports/export [get]
 func ExportReport(c *gin.Context) {
+	// Get month parameter (YYYY-MM format) or default to current month
+	now := time.Now()
+	monthParam := c.DefaultQuery("month", now.Format("2006-01"))
+	
+	// Parse month parameter
+	var startDate, endDate time.Time
+	parsedMonth, err := time.Parse("2006-01", monthParam)
+	if err != nil {
+		startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		endDate = startDate.AddDate(0, 1, 0)
+		monthParam = now.Format("2006-01")
+	} else {
+		startDate = time.Date(parsedMonth.Year(), parsedMonth.Month(), 1, 0, 0, 0, 0, now.Location())
+		endDate = startDate.AddDate(0, 1, 0)
+	}
+
 	// 1. Set Header agar browser menganggap ini file download
-	filename := fmt.Sprintf("operational_report_%s.csv", time.Now().Format("20060102_1504"))
+	filename := fmt.Sprintf("operational_report_%s.csv", parsedMonth.Format("2006-01"))
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// Add BOM for Excel to recognize UTF-8
@@ -73,9 +97,10 @@ func ExportReport(c *gin.Context) {
 		return
 	}
 
-	// 4. Query Data Tiket (Bisa ditambah filter by date query param jika perlu)
+	// 4. Query Data Tiket - Filtered by selected month
 	var tickets []models.Ticket
 	database.DB.Preload("Requester").
+		Where("created_at >= ? AND created_at < ?", startDate, endDate).
 		Order("created_at desc").
 		Find(&tickets)
 
@@ -149,7 +174,14 @@ func ExportReport(c *gin.Context) {
 	writer.Flush()
 }
 
-// [NEW] Handler untuk Download Template Shift CSV
+// DownloadShiftTemplate godoc
+// @Summary      Download shift template
+// @Description  Download CSV template for shift import
+// @Tags         Manager
+// @Produce      text/csv
+// @Security     CookieAuth
+// @Success      200  {file}  file  "CSV template download"
+// @Router       /manager/shifts/template [get]
 func DownloadShiftTemplate(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment; filename=shift_import_template.csv")
 	c.Header("Content-Type", "text/csv")
@@ -168,6 +200,19 @@ func DownloadShiftTemplate(c *gin.Context) {
 	writer.Flush()
 }
 
+// CreateShift godoc
+// @Summary      Create shift
+// @Description  Create a new shift assignment for staff
+// @Tags         Manager
+// @Accept       x-www-form-urlencoded
+// @Produce      html
+// @Security     CookieAuth
+// @Param        staff_id    formData  string  true  "Staff user ID"
+// @Param        label       formData  string  false "Shift label"
+// @Param        start_time  formData  string  true  "Start time (datetime-local)"
+// @Param        end_time    formData  string  true  "End time (datetime-local)"
+// @Success      302  {string}  string  "Redirect to dashboard"
+// @Router       /manager/shifts/create [post]
 func CreateShift(c *gin.Context) {
 	staffID := c.PostForm("staff_id")
 	label := c.PostForm("label")
@@ -217,23 +262,54 @@ type ChartData struct {
 	Resolved []int64  `json:"resolved"` // [4, 10, 7...]
 }
 
+// Dashboard godoc
+// @Summary      Manager dashboard
+// @Description  Display manager dashboard with KPIs, charts, and management tools
+// @Tags         Manager
+// @Produce      html
+// @Security     CookieAuth
+// @Param        month         query  string  false  "Month filter (YYYY-MM)"
+// @Param        history_page  query  int     false  "Pagination page for resolved tickets"
+// @Success      200  {string}  string  "HTML page"
+// @Router       /manager [get]
 func Dashboard(c *gin.Context) {
 
-	period := c.DefaultQuery("period", "this_month")
-	var startDate time.Time
+	// Get month parameter (YYYY-MM format) or default to current month
 	now := time.Now()
-
-	if period == "last_month" {
-		startDate = now.AddDate(0, -1, 0) // Mundur 1 bulan
+	monthParam := c.DefaultQuery("month", now.Format("2006-01"))
+	
+	// Parse month parameter
+	var startDate, endDate time.Time
+	parsedMonth, err := time.Parse("2006-01", monthParam)
+	if err != nil {
+		// Default to current month if invalid format
+		startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		endDate = startDate.AddDate(0, 1, 0)
+		monthParam = now.Format("2006-01")
 	} else {
-		startDate = now.AddDate(0, 0, -30) // Default 30 hari terakhir
+		startDate = time.Date(parsedMonth.Year(), parsedMonth.Month(), 1, 0, 0, 0, 0, now.Location())
+		endDate = startDate.AddDate(0, 1, 0)
+	}
+	
+	// Generate list of last 12 months for dropdown
+	type MonthOption struct {
+		Value string // YYYY-MM
+		Label string // "December 2024"
+	}
+	monthOptions := make([]MonthOption, 12)
+	for i := 0; i < 12; i++ {
+		monthDate := now.AddDate(0, -i, 0)
+		monthOptions[i] = MonthOption{
+			Value: monthDate.Format("2006-01"),
+			Label: monthDate.Format("January 2006"),
+		}
 	}
 	
 	// MTTA
 	var mttaPtr *float64
 	database.DB.Model(&models.Ticket{}).
 		Select("AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/60)").
-		Where("first_response_at IS NOT NULL AND created_at >= ?", startDate).
+		Where("first_response_at IS NOT NULL AND created_at >= ? AND created_at < ?", startDate, endDate).
 		Scan(&mttaPtr)
 	mtta := 0.0
 	if mttaPtr != nil { mtta = *mttaPtr }
@@ -242,7 +318,7 @@ func Dashboard(c *gin.Context) {
 	var mttrPtr *float64
 	database.DB.Model(&models.Ticket{}).
 		Select("AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60)").
-		Where("resolved_at IS NOT NULL AND created_at >= ?", startDate).
+		Where("resolved_at IS NOT NULL AND created_at >= ? AND created_at < ?", startDate, endDate).
 		Scan(&mttrPtr)
 	mttr := 0.0
 	if mttrPtr != nil { mttr = *mttrPtr }
@@ -250,37 +326,48 @@ func Dashboard(c *gin.Context) {
 	// FCR Calculation
 	var totalResolved int64
 	var fcrCount int64
-	database.DB.Model(&models.Ticket{}).Where("status = ? AND created_at >= ?", models.StatusResolved, startDate).Count(&totalResolved)
-	database.DB.Model(&models.Ticket{}).Where("status = ? AND is_handover = ? AND created_at >= ?", models.StatusResolved, false, startDate).Count(&fcrCount)
+	database.DB.Model(&models.Ticket{}).Where("status = ? AND created_at >= ? AND created_at < ?", models.StatusResolved, startDate, endDate).Count(&totalResolved)
+	database.DB.Model(&models.Ticket{}).Where("status = ? AND is_handover = ? AND created_at >= ? AND created_at < ?", models.StatusResolved, false, startDate, endDate).Count(&fcrCount)
 	
 	fcrRate := 0.0
 	if totalResolved > 0 {
 		fcrRate = (float64(fcrCount) / float64(totalResolved)) * 100
 	}
-
+	
+	// Weekly Chart Data for the selected month (4-5 weeks)
 	chartData := ChartData{
-		Labels:   make([]string, 7),
-		Incoming: make([]int64, 7),
-		Resolved: make([]int64, 7),
+		Labels:   []string{},
+		Incoming: []int64{},
+		Resolved: []int64{},
 	}
 
-	for i := 6; i >= 0; i-- {
-		dayDate := now.AddDate(0, 0, -i)
-		dayStart := time.Date(dayDate.Year(), dayDate.Month(), dayDate.Day(), 0, 0, 0, 0, dayDate.Location())
-		dayEnd := dayStart.Add(24 * time.Hour)
+	// Get each week of the month
+	weekStart := startDate
+	weekNum := 1
+	for weekStart.Before(endDate) {
+		weekEnd := weekStart.AddDate(0, 0, 7)
+		if weekEnd.After(endDate) {
+			weekEnd = endDate
+		}
 		
-		idx := 6 - i
-		chartData.Labels[idx] = dayDate.Format("Mon") // "Mon", "Tue"
-
-		// Count Incoming
+		chartData.Labels = append(chartData.Labels, fmt.Sprintf("Week %d", weekNum))
+		
+		// Count Incoming this week
+		var incoming int64
 		database.DB.Model(&models.Ticket{}).
-			Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).
-			Count(&chartData.Incoming[idx])
+			Where("created_at >= ? AND created_at < ?", weekStart, weekEnd).
+			Count(&incoming)
+		chartData.Incoming = append(chartData.Incoming, incoming)
 
-		// Count Resolved
+		// Count Resolved this week
+		var resolved int64
 		database.DB.Model(&models.Ticket{}).
-			Where("resolved_at >= ? AND resolved_at < ?", dayStart, dayEnd).
-			Count(&chartData.Resolved[idx])
+			Where("resolved_at >= ? AND resolved_at < ?", weekStart, weekEnd).
+			Count(&resolved)
+		chartData.Resolved = append(chartData.Resolved, resolved)
+		
+		weekStart = weekEnd
+		weekNum++
 	}
 
 	// SLA Compliance Stats
@@ -294,7 +381,7 @@ func Dashboard(c *gin.Context) {
     var slaMetrics []interface{}
 	// Removed redeclared variables here (allStaff, routineTemplates) to fix error
 
-	// Query for Urgent (15 mins)
+	// Query for Urgent (15 mins) - FILTERED BY SELECTED MONTH
 	var urgentStats SLAMetric
 	database.DB.Raw(`
 		SELECT 
@@ -303,13 +390,14 @@ func Dashboard(c *gin.Context) {
 			COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (resolved_at - created_at))/60 <= 15) as compliant_tickets
 		FROM tickets 
 		WHERE priority = 'URGENT_ON_AIR' AND status IN ('RESOLVED', 'CLOSED')
-	`).Scan(&urgentStats)
+		AND created_at >= ? AND created_at < ?
+	`, startDate, endDate).Scan(&urgentStats)
 	if urgentStats.TotalTickets > 0 {
 		urgentStats.ComplianceRate = (float64(urgentStats.CompliantTickets) / float64(urgentStats.TotalTickets)) * 100
 	}
 	slaMetrics = append(slaMetrics, urgentStats)
 
-	// Query for Normal (8 Hours = 480 mins)
+	// Query for Normal/High (8 Hours = 480 mins) - FILTERED BY SELECTED MONTH
 	var normalStats SLAMetric
 	database.DB.Raw(`
 		SELECT 
@@ -318,7 +406,8 @@ func Dashboard(c *gin.Context) {
 			COUNT(*) FILTER (WHERE EXTRACT(EPOCH FROM (resolved_at - created_at))/60 <= 480) as compliant_tickets
 		FROM tickets 
 		WHERE priority IN ('NORMAL', 'HIGH') AND status IN ('RESOLVED', 'CLOSED')
-	`).Scan(&normalStats)
+		AND created_at >= ? AND created_at < ?
+	`, startDate, endDate).Scan(&normalStats)
 	if normalStats.TotalTickets > 0 {
 		normalStats.ComplianceRate = (float64(normalStats.CompliantTickets) / float64(normalStats.TotalTickets)) * 100
 	}
@@ -332,7 +421,7 @@ func Dashboard(c *gin.Context) {
 	var categoryDistribution []CategoryCount
 	database.DB.Model(&models.Ticket{}).
 		Select("category, COUNT(*) as count").
-		Where("created_at >= ?", startDate).
+		Where("created_at >= ? AND created_at < ?", startDate, endDate).
 		Group("category").
 		Scan(&categoryDistribution)
 
@@ -355,7 +444,7 @@ func Dashboard(c *gin.Context) {
 	var priorityDistribution []PriorityCount
 	database.DB.Model(&models.Ticket{}).
 		Select("priority, COUNT(*) as count").
-		Where("created_at >= ?", startDate).
+		Where("created_at >= ? AND created_at < ?", startDate, endDate).
 		Group("priority").
 		Scan(&priorityDistribution)
 
@@ -374,7 +463,7 @@ func Dashboard(c *gin.Context) {
 	var statusDistribution []StatusCount
 	database.DB.Model(&models.Ticket{}).
 		Select("status, COUNT(*) as count").
-		Where("created_at >= ?", startDate).
+		Where("created_at >= ? AND created_at < ?", startDate, endDate).
 		Group("status").
 		Scan(&statusDistribution)
 
@@ -478,19 +567,19 @@ func Dashboard(c *gin.Context) {
 	database.DB.Where("role = ?", models.RoleStaff).Find(&staffUsers)
 
 	for _, user := range staffUsers {
-		// Tickets Solved - count RESOLVE activities by this user
+		// Tickets Solved - count RESOLVE activities by this user IN SELECTED MONTH
 		var solvedCount int64
 		database.DB.Model(&models.TicketActivity{}).
-			Where("actor_id = ? AND action_type = ?", user.ID, "RESOLVE").
+			Where("actor_id = ? AND action_type = ? AND created_at >= ? AND created_at < ?", user.ID, "RESOLVE", startDate, endDate).
 			Count(&solvedCount)
 		
-		// Big Book Contributions
+		// Big Book Contributions IN SELECTED MONTH
 		var bbCount int64
 		database.DB.Model(&models.KnowledgeArticle{}).
-			Where("author_id = ?", user.ID).
+			Where("author_id = ? AND created_at >= ? AND created_at < ?", user.ID, startDate, endDate).
 			Count(&bbCount)
 
-		// Calculate MTTA for this staff
+		// Calculate MTTA for this staff IN SELECTED MONTH
 		// MTTA = Average time from ticket creation to first response by THIS staff
 		var mttaMinutes *float64
 		database.DB.Raw(`
@@ -499,13 +588,14 @@ func Dashboard(c *gin.Context) {
 			JOIN tickets t ON ta.ticket_id = t.id
 			WHERE ta.actor_id = ?
 			AND ta.action_type IN ('REPLY', 'IN_PROGRESS', 'STATUS_CHANGE')
+			AND ta.created_at >= ? AND ta.created_at < ?
 			AND ta.created_at = (
 				SELECT MIN(ta2.created_at) 
 				FROM ticket_activities ta2 
 				WHERE ta2.ticket_id = t.id 
 				AND ta2.actor_id = ?
 			)
-		`, user.ID, user.ID).Scan(&mttaMinutes)
+		`, user.ID, startDate, endDate, user.ID).Scan(&mttaMinutes)
 
 		mttaStr := "N/A"
 		if mttaMinutes != nil && *mttaMinutes > 0 {
@@ -516,7 +606,7 @@ func Dashboard(c *gin.Context) {
 			}
 		}
 
-		// Calculate MTTR for this staff
+		// Calculate MTTR for this staff IN SELECTED MONTH
 		// MTTR = Average time from ticket creation to resolution for tickets resolved by THIS staff
 		var mttrMinutes *float64
 		database.DB.Raw(`
@@ -526,7 +616,8 @@ func Dashboard(c *gin.Context) {
 			WHERE ta.actor_id = ?
 			AND ta.action_type = 'RESOLVE'
 			AND t.resolved_at IS NOT NULL
-		`, user.ID).Scan(&mttrMinutes)
+			AND ta.created_at >= ? AND ta.created_at < ?
+		`, user.ID, startDate, endDate).Scan(&mttrMinutes)
 
 		mttrStr := "N/A"
 		if mttrMinutes != nil && *mttrMinutes > 0 {
@@ -576,12 +667,153 @@ func Dashboard(c *gin.Context) {
 	var routineTemplates []models.RoutineTemplate
 	database.DB.Find(&routineTemplates)
 
+	// 9. TICKET HISTORY DATA
+	// Incoming Tickets (OPEN, IN_PROGRESS, HANDOVER)
+	type IncomingTicketView struct {
+		ID           uuid.UUID
+		TicketNumber int
+		Subject      string
+		Location     string
+		Priority     string
+		Category     string
+		Status       string
+		RequesterName string
+		CreatedAt    time.Time
+	}
+	var incomingTickets []IncomingTicketView
+	database.DB.Raw(`
+		SELECT t.id, t.ticket_number, t.subject, t.location, t.priority, t.category, t.status, 
+		       u.full_name as requester_name, t.created_at
+		FROM tickets t
+		LEFT JOIN users u ON t.requester_id = u.id
+		WHERE t.status IN ('OPEN', 'IN_PROGRESS', 'HANDOVER')
+		ORDER BY t.created_at DESC
+		LIMIT 50
+	`).Scan(&incomingTickets)
+
+	// Resolved Tickets (RESOLVED, CLOSED) with time metrics
+	type ResolvedTicketView struct {
+		ID             uuid.UUID
+		TicketNumber   int
+		Subject        string
+		Category       string
+		RequesterName  string
+		ResponderName  string
+		ResponseTime   string // formatted string
+		SolveTime      string // formatted string
+		ResolvedAt     time.Time
+	}
+	var resolvedTickets []ResolvedTicketView
+
+	// Query resolved tickets with computed time metrics
+	// Get page parameter for pagination (default page 1)
+	historyPage := 1
+	if pageStr := c.Query("history_page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			historyPage = p
+		}
+	}
+	historyLimit := 10
+	historyOffset := (historyPage - 1) * historyLimit
+
+	// Count total resolved tickets for pagination
+	var totalResolvedCount int64
+	database.DB.Raw(`
+		SELECT COUNT(*) 
+		FROM tickets t
+		WHERE t.status IN ('RESOLVED', 'CLOSED')
+		AND t.resolved_at >= ? AND t.resolved_at < ?
+	`, startDate, endDate).Scan(&totalResolvedCount)
+
+	totalHistoryPages := int((totalResolvedCount + int64(historyLimit) - 1) / int64(historyLimit))
+	if totalHistoryPages < 1 {
+		totalHistoryPages = 1
+	}
+
+	var resolvedRaw []struct {
+		ID            uuid.UUID
+		TicketNumber  int
+		Subject       string
+		Category      string
+		RequesterName string
+		CreatedAt     time.Time
+		FirstResponseAt *time.Time
+		ResolvedAt    *time.Time
+	}
+	database.DB.Raw(`
+		SELECT t.id, t.ticket_number, t.subject, t.category, 
+		       u.full_name as requester_name, t.created_at, t.first_response_at, t.resolved_at
+		FROM tickets t
+		LEFT JOIN users u ON t.requester_id = u.id
+		WHERE t.status IN ('RESOLVED', 'CLOSED')
+		AND t.resolved_at >= ? AND t.resolved_at < ?
+		ORDER BY t.resolved_at DESC
+		LIMIT ? OFFSET ?
+	`, startDate, endDate, historyLimit, historyOffset).Scan(&resolvedRaw)
+
+	// Process each resolved ticket to get responder name and format times
+	for _, rt := range resolvedRaw {
+		// Find responder from TicketActivity
+		var responderName string
+		var act models.TicketActivity
+		if err := database.DB.Preload("Actor").
+			Where("ticket_id = ? AND action_type = ?", rt.ID, "RESOLVE").
+			Order("created_at desc").
+			First(&act).Error; err == nil {
+			responderName = act.Actor.FullName
+		} else {
+			responderName = "-"
+		}
+
+		// Calculate response time
+		responseTime := "-"
+		if rt.FirstResponseAt != nil {
+			mins := rt.FirstResponseAt.Sub(rt.CreatedAt).Minutes()
+			if mins < 60 {
+				responseTime = fmt.Sprintf("%.0f menit", mins)
+			} else {
+				responseTime = fmt.Sprintf("%.1f jam", mins/60)
+			}
+		}
+
+		// Calculate solve time
+		solveTime := "-"
+		resolvedAt := time.Time{}
+		if rt.ResolvedAt != nil {
+			resolvedAt = *rt.ResolvedAt
+			mins := rt.ResolvedAt.Sub(rt.CreatedAt).Minutes()
+			if mins < 60 {
+				solveTime = fmt.Sprintf("%.0f menit", mins)
+			} else if mins < 1440 {
+				solveTime = fmt.Sprintf("%.1f jam", mins/60)
+			} else {
+				solveTime = fmt.Sprintf("%.1f hari", mins/1440)
+			}
+		}
+
+		resolvedTickets = append(resolvedTickets, ResolvedTicketView{
+			ID:            rt.ID,
+			TicketNumber:  rt.TicketNumber,
+			Subject:       rt.Subject,
+			Category:      rt.Category,
+			RequesterName: rt.RequesterName,
+			ResponderName: responderName,
+			ResponseTime:  responseTime,
+			SolveTime:     solveTime,
+			ResolvedAt:    resolvedAt,
+		})
+	}
+
+	// Calculate combined review queue count
+	reviewQueueCount := int(newArticlesCount) + len(candidateTickets)
+
 	c.HTML(http.StatusOK, "manager/dashboard.html", gin.H{
 		"title":             "Manager Dashboard",
 		"mtta":              int(mtta),
 		"mttr":              int(mttr),
 		"fcr":               int(fcrRate),
-		"period":            period, // Kirim balik ke UI untuk set selected option
+		"selectedMonth":     monthParam, // Current selected month (YYYY-MM)
+		"monthOptions":      monthOptions, // List of last 12 months for dropdown
 		"chartData":         chartData, // Data Chart
 		// Big Book Data
 		"articleCount": articleCount, 
@@ -589,6 +821,7 @@ func Dashboard(c *gin.Context) {
 		"pendingArticles": pendingArticles,
 		"publishedArticles": publishedArticles,
 		"candidateTickets": candidateTickets, // Data tiket yang belum diconvert
+		"reviewQueueCount": reviewQueueCount, // Combined count for review queue display
 		"upcomingShifts":    upcomingShifts,
 		"activeShift":       activeShift,
 		"hasActiveShift":    hasActiveShift,
@@ -596,6 +829,12 @@ func Dashboard(c *gin.Context) {
 		"allStaff":          allStaff,
 		"slaMetrics":        slaMetrics,
 		"routineTemplates":  routineTemplates,
+		// Ticket History Data
+		"incomingTickets":    incomingTickets,
+		"resolvedTickets":    resolvedTickets,
+		"historyPage":        historyPage,
+		"totalHistoryPages":  totalHistoryPages,
+		"totalResolvedCount": totalResolvedCount,
 		// Pie Chart Data
 		"categoryLabels":  categoryLabels,
 		"categoryCounts":  categoryCounts,
@@ -719,15 +958,24 @@ func ConvertTicketToArticle(c *gin.Context) {
 		return
 	}
 
-	userIDStr, _ := c.Cookie("user_id")
-	managerID, _ := uuid.Parse(userIDStr)
+	// Find the staff who resolved this ticket (author = resolver, not manager)
+	var resolveActivity models.TicketActivity
+	var authorID uuid.UUID
+	if err := database.DB.Where("ticket_id = ? AND action_type = ?", ticketID, "RESOLVE").
+		Order("created_at desc").First(&resolveActivity).Error; err == nil {
+		// Found the resolver - use them as author
+		authorID = resolveActivity.ActorID
+	} else {
+		// Fallback: if no RESOLVE activity found, use ticket requester (should not happen)
+		authorID = ticket.RequesterID
+	}
 
 	// Buat Artikel Baru
 	article := models.KnowledgeArticle{
 		Title:      ticket.Subject,
 		Category:   ticket.Category,
 		Content:    ticket.Solution, // Solusi tiket otomatis jadi konten artikel
-		AuthorID:   managerID,       // Di-publish oleh Manager
+		AuthorID:   authorID,        // Author = Staff who resolved the ticket
 		IsVerified: true,            // Langsung verified karena masuk jalur cepat
 		CreatedAt:  time.Now(),
 	}

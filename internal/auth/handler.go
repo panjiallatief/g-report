@@ -20,12 +20,30 @@ func RegisterRoutes(r *gin.Engine) {
 	}
 }
 
+// ShowLoginForm godoc
+// @Summary      Show login form
+// @Description  Display the login page
+// @Tags         Auth
+// @Produce      html
+// @Success      200  {string}  string  "HTML page"
+// @Router       /auth/login [get]
 func ShowLoginForm(c *gin.Context) {
 	c.HTML(http.StatusOK, "pages/auth/login.html", gin.H{
 		"title": "Login",
 	})
 }
 
+// Login godoc
+// @Summary      User login
+// @Description  Authenticate user with email/username and password
+// @Tags         Auth
+// @Accept       x-www-form-urlencoded
+// @Produce      html
+// @Param        email     formData  string  true  "Email or Username"
+// @Param        password  formData  string  true  "Password"
+// @Success      302  {string}  string  "Redirect to dashboard"
+// @Failure      401  {string}  string  "Invalid credentials"
+// @Router       /auth/login [post]
 func Login(c *gin.Context) {
 	identifier := c.PostForm("email") // Can be email or username
 	password := c.PostForm("password")
@@ -148,6 +166,13 @@ func Login(c *gin.Context) {
 	}
 }
 
+// Logout godoc
+// @Summary      User logout
+// @Description  Log out user and clear session cookies
+// @Tags         Auth
+// @Produce      html
+// @Success      302  {string}  string  "Redirect to login"
+// @Router       /auth/logout [get]
 func Logout(c *gin.Context) {
 	c.SetCookie("user_id", "", -1, "/", "", false, true)
 	c.SetCookie("user_role", "", -1, "/", "", false, true)

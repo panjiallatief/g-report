@@ -33,6 +33,14 @@ func RegisterRoutes(r *gin.Engine) {
 	}
 }
 
+// Dashboard godoc
+// @Summary      Consumer dashboard
+// @Description  Display consumer dashboard with recent tickets
+// @Tags         Consumer
+// @Produce      html
+// @Security     CookieAuth
+// @Success      200  {string}  string  "HTML page"
+// @Router       /consumer [get]
 func Dashboard(c *gin.Context) {
 	var tickets []models.Ticket
 	
@@ -51,7 +59,15 @@ func Dashboard(c *gin.Context) {
 	})
 }
 
-// SearchBigBook updated with Redis caching
+// SearchBigBook godoc
+// @Summary      Search knowledge base
+// @Description  Search Big Book articles with Redis caching
+// @Tags         Consumer
+// @Produce      json
+// @Security     CookieAuth
+// @Param        q  query  string  false  "Search query"
+// @Success      200  {array}  models.KnowledgeArticle
+// @Router       /consumer/bigbook [get]
 func SearchBigBook(c *gin.Context) {
 	query := c.Query("q")
 	cacheKey := "cache:bigbook:" + query
@@ -87,6 +103,16 @@ func SearchBigBook(c *gin.Context) {
 }
 
 
+// ArticleDetail godoc
+// @Summary      View article detail
+// @Description  Display knowledge article details and increment view count
+// @Tags         Consumer
+// @Produce      html
+// @Security     CookieAuth
+// @Param        id  path  string  true  "Article ID"
+// @Success      200  {string}  string  "HTML page"
+// @Failure      404  {string}  string  "Article not found"
+// @Router       /consumer/articles/{id} [get]
 func ArticleDetail(c *gin.Context) {
 	id := c.Param("id")
 	var article models.KnowledgeArticle
@@ -104,6 +130,22 @@ func ArticleDetail(c *gin.Context) {
 	})
 }
 
+// CreateTicket godoc
+// @Summary      Create new ticket
+// @Description  Submit a new support ticket
+// @Tags         Consumer
+// @Accept       multipart/form-data
+// @Produce      html
+// @Security     CookieAuth
+// @Param        location     formData  string  true   "Location"
+// @Param        category     formData  string  true   "Category"
+// @Param        subject      formData  string  true   "Subject"
+// @Param        description  formData  string  true   "Description"
+// @Param        urgency      formData  string  false  "Urgency"
+// @Param        proof_image  formData  file    false  "Proof image"
+// @Success      302  {string}  string  "Redirect to dashboard"
+// @Failure      500  {object}  object  "Server error"
+// @Router       /consumer/ticket [post]
 func CreateTicket(c *gin.Context) {
 	userIDStr, _ := c.Cookie("user_id")
 	userID, _ := uuid.Parse(userIDStr)
@@ -186,7 +228,16 @@ func CreateTicket(c *gin.Context) {
 }
 
 
-// NEW: Get Ticket Details & Activities (JSON for AlpineJS)
+// GetTicketDetailJSON godoc
+// @Summary      Get ticket details
+// @Description  Get ticket details and chat history as JSON
+// @Tags         Consumer
+// @Produce      json
+// @Security     CookieAuth
+// @Param        id  path  string  true  "Ticket ID"
+// @Success      200  {object}  object  "Ticket and activities"
+// @Failure      404  {object}  object  "Ticket not found"
+// @Router       /consumer/tickets/{id}/details [get]
 func GetTicketDetailJSON(c *gin.Context) {
 	id := c.Param("id")
 	var ticket models.Ticket
@@ -244,7 +295,17 @@ func GetTicketDetailJSON(c *gin.Context) {
 	})
 }
 
-// Reply to Ticket (Consumer Side) with Redis Pub/Sub
+// ReplyTicket godoc
+// @Summary      Reply to ticket
+// @Description  Add a reply message to a ticket
+// @Tags         Consumer
+// @Accept       x-www-form-urlencoded
+// @Produce      html
+// @Security     CookieAuth
+// @Param        id       path      string  true  "Ticket ID"
+// @Param        message  formData  string  true  "Reply message"
+// @Success      302  {string}  string  "Redirect to dashboard"
+// @Router       /consumer/tickets/{id}/reply [post]
 func ReplyTicket(c *gin.Context) {
 	id := c.Param("id")
 	message := c.PostForm("message")
@@ -287,7 +348,15 @@ func ReplyTicket(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/consumer")
 }
 
-// TicketChatStream provides Server-Sent Events for real-time chat
+// TicketChatStream godoc
+// @Summary      Ticket chat SSE stream
+// @Description  Server-Sent Events stream for real-time chat updates
+// @Tags         Consumer
+// @Produce      text/event-stream
+// @Security     CookieAuth
+// @Param        id  path  string  true  "Ticket ID"
+// @Success      200  {string}  string  "SSE stream"
+// @Router       /consumer/tickets/{id}/stream [get]
 func TicketChatStream(c *gin.Context) {
 	tickemID := c.Param("id")
 

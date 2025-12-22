@@ -16,6 +16,14 @@ import (
 	"github.com/google/uuid"
 )
 
+// History godoc
+// @Summary      Staff work history
+// @Description  Display resolved tickets history for current staff
+// @Tags         Staff
+// @Produce      html
+// @Security     CookieAuth
+// @Success      200  {string}  string  "HTML page"
+// @Router       /staff/history [get]
 func History(c *gin.Context) {
 	userIDStr, err := c.Cookie("user_id")
     if err != nil || userIDStr == "" {
@@ -70,6 +78,14 @@ func RegisterRoutes(r *gin.Engine) {
 	}
 }
 
+// Dashboard godoc
+// @Summary      Staff dashboard
+// @Description  Display staff dashboard with active tickets and routines
+// @Tags         Staff
+// @Produce      html
+// @Security     CookieAuth
+// @Success      200  {string}  string  "HTML page"
+// @Router       /staff [get]
 func Dashboard(c *gin.Context) {
 	var openTicketsCount int64
 	database.DB.Model(&models.Ticket{}).Where("status IN ?", []models.TicketStatus{models.StatusOpen, models.StatusInProgress}).Count(&openTicketsCount)
@@ -127,7 +143,14 @@ var routineInstances []models.RoutineInstance
 	})
 }
 
-// [FIX] Menggunakan Partial Template agar tidak stack/bertumpuk
+// TicketList godoc
+// @Summary      Active tickets list
+// @Description  HTMX partial for active tickets list
+// @Tags         Staff
+// @Produce      html
+// @Security     CookieAuth
+// @Success      200  {string}  string  "HTML partial"
+// @Router       /staff/tickets/list [get]
 func TicketList(c *gin.Context) {
 	var activeTickets []models.Ticket
 	database.DB.Where("status IN ?", []models.TicketStatus{models.StatusOpen, models.StatusInProgress, models.StatusHandover}).
@@ -210,6 +233,16 @@ func ToggleRoutineItem(c *gin.Context) {
 	c.Status(200) // HTMX request, no need to redirect full page if just toggling
 }
 
+// TicketDetail godoc
+// @Summary      Ticket detail
+// @Description  Display ticket details with chat history
+// @Tags         Staff
+// @Produce      html
+// @Security     CookieAuth
+// @Param        id  path  string  true  "Ticket ID"
+// @Success      200  {string}  string  "HTML page"
+// @Failure      404  {string}  string  "Ticket not found"
+// @Router       /staff/tickets/{id} [get]
 func TicketDetail(c *gin.Context) {
 	id := c.Param("id")
 	var ticket models.Ticket
@@ -232,6 +265,17 @@ func TicketDetail(c *gin.Context) {
 }
 
 
+// ResolveTicket godoc
+// @Summary      Resolve ticket
+// @Description  Mark ticket as resolved with solution
+// @Tags         Staff
+// @Accept       x-www-form-urlencoded
+// @Produce      html
+// @Security     CookieAuth
+// @Param        id        path      string  true  "Ticket ID"
+// @Param        solution  formData  string  true  "Solution description"
+// @Success      302  {string}  string  "Redirect to dashboard"
+// @Router       /staff/tickets/{id}/resolve [post]
 func ResolveTicket(c *gin.Context) {
 	id := c.Param("id")
 	solution := c.PostForm("solution")
@@ -258,6 +302,15 @@ func ResolveTicket(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/staff")
 }
 
+// BigBook godoc
+// @Summary      Knowledge base page
+// @Description  Display Big Book articles and candidates
+// @Tags         Staff
+// @Produce      html
+// @Security     CookieAuth
+// @Param        q  query  string  false  "Search query"
+// @Success      200  {string}  string  "HTML page"
+// @Router       /staff/bigbook [get]
 func BigBook(c *gin.Context) {
 	query := c.Query("q")
 	var articles []models.KnowledgeArticle
@@ -313,7 +366,15 @@ func Alerts(c *gin.Context) {
 	})
 }
 
-// SearchBigBookJSON updated for alphabetical default list
+// SearchBigBookJSON godoc
+// @Summary      Search knowledge base JSON
+// @Description  Search Big Book articles and return JSON results
+// @Tags         Staff
+// @Produce      json
+// @Security     CookieAuth
+// @Param        q  query  string  false  "Search query"
+// @Success      200  {array}  object  "Search results"
+// @Router       /staff/bigbook/search [get]
 func SearchBigBookJSON(c *gin.Context) {
 	query := c.Query("q")
 	var results []map[string]interface{}

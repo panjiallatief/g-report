@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"it-broadcast-ops/internal/auth"
 	"it-broadcast-ops/internal/modules/consumer"
 	"it-broadcast-ops/internal/modules/manager"
@@ -85,6 +87,9 @@ func NewRouter() *gin.Engine {
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(302, "/auth/login")
 	})
+
+	// Swagger API Documentation
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return r
 }

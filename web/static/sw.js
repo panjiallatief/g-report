@@ -3,9 +3,6 @@ const urlsToCache = [
   '/',
   '/auth/login',
   '/static/manifest.json',
-  // 'https://cdn.tailwindcss.com', <--- HAPUS ATAU KOMENTAR INI
-  // Tailwind CDN sering bermasalah dengan CORS di Service Worker.
-  // Biarkan browser handle caching Tailwind secara normal (HTTP Cache), bukan lewat SW.
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://unpkg.com/htmx.org@1.9.5',
   'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js',

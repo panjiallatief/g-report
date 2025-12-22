@@ -34,3 +34,4 @@ node_modules/
 # SSL Certificates (generated locally)
 server.crt
 server.key
+cert/

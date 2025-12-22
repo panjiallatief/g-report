@@ -30,14 +30,38 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/report/history/:token", ShowTicketHistory)
 }
 
-// ShowReportForm displays the public ticket submission form
+// ShowReportForm godoc
+// @Summary      Show public report form
+// @Description  Display the public ticket submission form (no auth required)
+// @Tags         Public
+// @Produce      html
+// @Success      200  {string}  string  "HTML page"
+// @Router       /report [get]
 func ShowReportForm(c *gin.Context) {
 	c.HTML(http.StatusOK, "public/report.html", gin.H{
 		"title": "Lapor Masalah - Quick Report",
 	})
 }
 
-// SubmitReport handles anonymous ticket submission with rate limiting
+// SubmitReport godoc
+// @Summary      Submit public report
+// @Description  Submit a ticket anonymously with rate limiting (3 per hour per IP)
+// @Tags         Public
+// @Accept       multipart/form-data
+// @Produce      html
+// @Param        name         formData  string  true   "Reporter name"
+// @Param        email        formData  string  true   "Reporter email"
+// @Param        phone        formData  string  true   "Phone number"
+// @Param        location     formData  string  false  "Location"
+// @Param        category     formData  string  false  "Category"
+// @Param        urgency      formData  string  false  "Urgency level"
+// @Param        subject      formData  string  true   "Subject"
+// @Param        description  formData  string  true   "Description"
+// @Param        proof_image  formData  file    false  "Proof image (max 5MB)"
+// @Success      302  {string}  string  "Redirect to success page"
+// @Failure      400  {string}  string  "Validation error"
+// @Failure      429  {string}  string  "Rate limit exceeded"
+// @Router       /report [post]
 func SubmitReport(c *gin.Context) {
 	clientIP := c.ClientIP()
 
@@ -59,6 +83,7 @@ func SubmitReport(c *gin.Context) {
 	email := strings.TrimSpace(c.PostForm("email"))
 	phone := strings.TrimSpace(c.PostForm("phone"))
 	location := c.PostForm("location")
+	category := c.PostForm("category")
 	urgency := c.PostForm("urgency")
 	subject := strings.TrimSpace(c.PostForm("subject"))
 	description := strings.TrimSpace(c.PostForm("description"))
@@ -76,7 +101,7 @@ func SubmitReport(c *gin.Context) {
 			"errors": errors,
 			"form": gin.H{
 				"name": name, "email": email, "phone": phone,
-				"location": location, "urgency": urgency,
+				"location": location, "category": category, "urgency": urgency,
 				"subject": subject, "description": description,
 			},
 		})
@@ -123,7 +148,7 @@ func SubmitReport(c *gin.Context) {
 	ticket := models.Ticket{
 		Location:      models.LocationEnum(location),
 		Priority:      priority,
-		Category:      "IT_NETWORK", // Default for quick reports
+		Category:      category, // From form selection
 		Subject:       subject,
 		Description:   description + "\n\n---\nReported by: " + name + "\nPhone: " + phone + "\nEmail: " + email,
 		ProofImageURL: proofURL,
@@ -162,7 +187,14 @@ func SubmitReport(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/report/success?token="+historyToken+"&email="+email)
 }
 
-// ShowSuccess displays confirmation after submission
+// ShowSuccess godoc
+// @Summary      Show success page
+// @Description  Display confirmation page after ticket submission
+// @Tags         Public
+// @Produce      html
+// @Param        email  query  string  false  "Reporter email"
+// @Success      200  {string}  string  "HTML page"
+// @Router       /report/success [get]
 func ShowSuccess(c *gin.Context) {
 	email := c.Query("email")
 	c.HTML(http.StatusOK, "public/success.html", gin.H{
@@ -171,7 +203,13 @@ func ShowSuccess(c *gin.Context) {
 	})
 }
 
-// ShowQRCode displays QR code for printing
+// ShowQRCode godoc
+// @Summary      Show QR code page
+// @Description  Display QR code for printing (links to report form)
+// @Tags         Public
+// @Produce      html
+// @Success      200  {string}  string  "HTML page"
+// @Router       /report/qrcode [get]
 func ShowQRCode(c *gin.Context) {
 	// Get base URL from request
 	scheme := "http"
@@ -186,7 +224,14 @@ func ShowQRCode(c *gin.Context) {
 	})
 }
 
-// ShowTicketHistory shows tickets for a user (via email link)
+// ShowTicketHistory godoc
+// @Summary      Show ticket history
+// @Description  Show tickets for a user via email link token
+// @Tags         Public
+// @Produce      html
+// @Param        token  path  string  true  "Access token"
+// @Success      302  {string}  string  "Redirect to login"
+// @Router       /report/history/{token} [get]
 func ShowTicketHistory(c *gin.Context) {
 	token := c.Param("token")
 	// For now, just redirect to login - full implementation needs token storage

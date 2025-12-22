@@ -1,0 +1,770 @@
+basePath: /
+definitions:
+  models.KnowledgeArticle:
+    properties:
+      author:
+        $ref: '#/definitions/models.User'
+      authorID:
+        type: string
+      category:
+        description: Simplified for now, mapped to enum in DB
+        type: string
+      content:
+        type: string
+      createdAt:
+        type: string
+      helpfulCount:
+        type: integer
+      id:
+        type: string
+      isVerified:
+        type: boolean
+      title:
+        type: string
+      updatedAt:
+        type: string
+      viewsCount:
+        type: integer
+    type: object
+  models.User:
+    properties:
+      avatarURL:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      fullName:
+        type: string
+      id:
+        type: string
+      isActive:
+        type: boolean
+      passwordHash:
+        description: Nullable for LDAP users
+        type: string
+      role:
+        $ref: '#/definitions/models.UserRole'
+      updatedAt:
+        type: string
+    type: object
+  models.UserRole:
+    enum:
+    - CONSUMER
+    - STAFF
+    - MANAGER
+    type: string
+    x-enum-varnames:
+    - RoleConsumer
+    - RoleStaff
+    - RoleManager
+  notification.SubscribeRequest:
+    properties:
+      endpoint:
+        type: string
+      keys:
+        properties:
+          auth:
+            type: string
+          p256dh:
+            type: string
+        type: object
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: IT Support
+  description: IT Broadcast Operations & Helpdesk System API. Provides endpoints for
+    ticket management, knowledge base (Big Book), shift scheduling, and real-time
+    notifications.
+  license:
+    name: MIT
+  title: G-Report API
+  version: "1.0"
+paths:
+  /auth/login:
+    get:
+      description: Display the login page
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: Show login form
+      tags:
+      - Auth
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Authenticate user with email/username and password
+      parameters:
+      - description: Email or Username
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to dashboard
+          schema:
+            type: string
+        "401":
+          description: Invalid credentials
+          schema:
+            type: string
+      summary: User login
+      tags:
+      - Auth
+  /auth/logout:
+    get:
+      description: Log out user and clear session cookies
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to login
+          schema:
+            type: string
+      summary: User logout
+      tags:
+      - Auth
+  /consumer:
+    get:
+      description: Display consumer dashboard with recent tickets
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Consumer dashboard
+      tags:
+      - Consumer
+  /consumer/articles/{id}:
+    get:
+      description: Display knowledge article details and increment view count
+      parameters:
+      - description: Article ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+        "404":
+          description: Article not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: View article detail
+      tags:
+      - Consumer
+  /consumer/bigbook:
+    get:
+      description: Search Big Book articles with Redis caching
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.KnowledgeArticle'
+            type: array
+      security:
+      - CookieAuth: []
+      summary: Search knowledge base
+      tags:
+      - Consumer
+  /consumer/ticket:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Submit a new support ticket
+      parameters:
+      - description: Location
+        in: formData
+        name: location
+        required: true
+        type: string
+      - description: Category
+        in: formData
+        name: category
+        required: true
+        type: string
+      - description: Subject
+        in: formData
+        name: subject
+        required: true
+        type: string
+      - description: Description
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Urgency
+        in: formData
+        name: urgency
+        type: string
+      - description: Proof image
+        in: formData
+        name: proof_image
+        type: file
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to dashboard
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: object
+      security:
+      - CookieAuth: []
+      summary: Create new ticket
+      tags:
+      - Consumer
+  /consumer/tickets/{id}/details:
+    get:
+      description: Get ticket details and chat history as JSON
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ticket and activities
+          schema:
+            type: object
+        "404":
+          description: Ticket not found
+          schema:
+            type: object
+      security:
+      - CookieAuth: []
+      summary: Get ticket details
+      tags:
+      - Consumer
+  /consumer/tickets/{id}/reply:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Add a reply message to a ticket
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reply message
+        in: formData
+        name: message
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to dashboard
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Reply to ticket
+      tags:
+      - Consumer
+  /consumer/tickets/{id}/stream:
+    get:
+      description: Server-Sent Events stream for real-time chat updates
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Ticket chat SSE stream
+      tags:
+      - Consumer
+  /manager:
+    get:
+      description: Display manager dashboard with KPIs, charts, and management tools
+      parameters:
+      - description: Month filter (YYYY-MM)
+        in: query
+        name: month
+        type: string
+      - description: Pagination page for resolved tickets
+        in: query
+        name: history_page
+        type: integer
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Manager dashboard
+      tags:
+      - Manager
+  /manager/reports/export:
+    get:
+      description: Download tickets report as CSV file
+      parameters:
+      - description: Month filter (YYYY-MM)
+        in: query
+        name: month
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV file download
+          schema:
+            type: file
+      security:
+      - CookieAuth: []
+      summary: Export tickets report
+      tags:
+      - Manager
+  /manager/shifts/create:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Create a new shift assignment for staff
+      parameters:
+      - description: Staff user ID
+        in: formData
+        name: staff_id
+        required: true
+        type: string
+      - description: Shift label
+        in: formData
+        name: label
+        type: string
+      - description: Start time (datetime-local)
+        in: formData
+        name: start_time
+        required: true
+        type: string
+      - description: End time (datetime-local)
+        in: formData
+        name: end_time
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to dashboard
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Create shift
+      tags:
+      - Manager
+  /manager/shifts/template:
+    get:
+      description: Download CSV template for shift import
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV template download
+          schema:
+            type: file
+      security:
+      - CookieAuth: []
+      summary: Download shift template
+      tags:
+      - Manager
+  /notifications/subscribe:
+    post:
+      consumes:
+      - application/json
+      description: Register push notification subscription
+      parameters:
+      - description: Push subscription
+        in: body
+        name: subscription
+        required: true
+        schema:
+          $ref: '#/definitions/notification.SubscribeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Subscribed successfully
+          schema:
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            type: object
+      security:
+      - CookieAuth: []
+      summary: Subscribe to push notifications
+      tags:
+      - Notifications
+  /notifications/test:
+    post:
+      description: Send a test push notification to current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification sent
+          schema:
+            type: object
+        "500":
+          description: Failed to send
+          schema:
+            type: object
+      security:
+      - CookieAuth: []
+      summary: Send test notification
+      tags:
+      - Notifications
+  /notifications/unsubscribe:
+    post:
+      consumes:
+      - application/json
+      description: Remove push notification subscription
+      parameters:
+      - description: Subscription endpoint
+        in: body
+        name: subscription
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unsubscribed
+          schema:
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            type: object
+      security:
+      - CookieAuth: []
+      summary: Unsubscribe from push notifications
+      tags:
+      - Notifications
+  /report:
+    get:
+      description: Display the public ticket submission form (no auth required)
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: Show public report form
+      tags:
+      - Public
+    post:
+      consumes:
+      - multipart/form-data
+      description: Submit a ticket anonymously with rate limiting (3 per hour per
+        IP)
+      parameters:
+      - description: Reporter name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Reporter email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Phone number
+        in: formData
+        name: phone
+        required: true
+        type: string
+      - description: Location
+        in: formData
+        name: location
+        type: string
+      - description: Category
+        in: formData
+        name: category
+        type: string
+      - description: Urgency level
+        in: formData
+        name: urgency
+        type: string
+      - description: Subject
+        in: formData
+        name: subject
+        required: true
+        type: string
+      - description: Description
+        in: formData
+        name: description
+        required: true
+        type: string
+      - description: Proof image (max 5MB)
+        in: formData
+        name: proof_image
+        type: file
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to success page
+          schema:
+            type: string
+        "400":
+          description: Validation error
+          schema:
+            type: string
+        "429":
+          description: Rate limit exceeded
+          schema:
+            type: string
+      summary: Submit public report
+      tags:
+      - Public
+  /report/history/{token}:
+    get:
+      description: Show tickets for a user via email link token
+      parameters:
+      - description: Access token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to login
+          schema:
+            type: string
+      summary: Show ticket history
+      tags:
+      - Public
+  /report/qrcode:
+    get:
+      description: Display QR code for printing (links to report form)
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: Show QR code page
+      tags:
+      - Public
+  /report/success:
+    get:
+      description: Display confirmation page after ticket submission
+      parameters:
+      - description: Reporter email
+        in: query
+        name: email
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: Show success page
+      tags:
+      - Public
+  /staff:
+    get:
+      description: Display staff dashboard with active tickets and routines
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Staff dashboard
+      tags:
+      - Staff
+  /staff/bigbook:
+    get:
+      description: Display Big Book articles and candidates
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Knowledge base page
+      tags:
+      - Staff
+  /staff/bigbook/search:
+    get:
+      description: Search Big Book articles and return JSON results
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Search results
+          schema:
+            items:
+              type: object
+            type: array
+      security:
+      - CookieAuth: []
+      summary: Search knowledge base JSON
+      tags:
+      - Staff
+  /staff/history:
+    get:
+      description: Display resolved tickets history for current staff
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Staff work history
+      tags:
+      - Staff
+  /staff/tickets/{id}:
+    get:
+      description: Display ticket details with chat history
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+        "404":
+          description: Ticket not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Ticket detail
+      tags:
+      - Staff
+  /staff/tickets/{id}/resolve:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Mark ticket as resolved with solution
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Solution description
+        in: formData
+        name: solution
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to dashboard
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Resolve ticket
+      tags:
+      - Staff
+  /staff/tickets/list:
+    get:
+      description: HTMX partial for active tickets list
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML partial
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Active tickets list
+      tags:
+      - Staff
+securityDefinitions:
+  CookieAuth:
+    in: cookie
+    name: user_id
+    type: apiKey
+swagger: "2.0"

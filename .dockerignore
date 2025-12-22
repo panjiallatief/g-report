@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+app
+main
+
+# Test files
+*_test.go
+*.test
+
+# Docs and config
+*.md
+docs/
+.agent/
+
+# Environment files (keep .env.example)
+.env
+.env.local
+
+# Certificates (will be mounted at runtime)
+certs/
+
+# Uploads (will be mounted at runtime)
+web/uploads/*
+!web/uploads/.gitkeep
+
+# Temporary files
+tmp/
+*.tmp
+*.log
