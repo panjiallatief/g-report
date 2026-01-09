@@ -15,7 +15,7 @@ Dashboard memberikan ringkasan tugas harian Anda, termasuk:
 ### Daftar Tiket
 Anda dapat melihat daftar tiket yang masuk di bagian bawah dashboard atau menu Tiket. Gunakan filter untuk mencari tiket berdasarkan status atau urgensi.
 
-![Ticket List](screenshots/staff_ticket_list_1765152279197.png)
+![Ticket List](screenshots/staff_ticket.png)
 
 ### Detail Tiket & Respon
 Klik pada judul tiket untuk melihat detailnya. Di halaman ini Anda dapat:
@@ -23,7 +23,7 @@ Klik pada judul tiket untuk melihat detailnya. Di halaman ini Anda dapat:
 2.  **Ubah Status**: Set ke `IN_PROGRESS` saat mulai bekerja, `RESOLVED` saat selesai.
 3.  **Unggah Foto**: Bukti perbaikan.
 
-![Ticket Detail](screenshots/staff_ticket_detail_1765152354864.png)
+![Ticket Detail](screenshots/staff_tikets_detail.png)
 
 ## Big Book (Knowledge Base)
 Big Book adalah kumpulan artikel solusi. Staff dapat:
@@ -31,4 +31,4 @@ Big Book adalah kumpulan artikel solusi. Staff dapat:
 -   Mengubah status tiket menjadi artikel ("Convert to Article").
 -   Mencari panduan teknis yang sudah ada.
 
-![Big Book](screenshots/staff_bigbook_1765152312055.png)
+![Big Book](screenshots/staff_ticket_list_1765152279197.png)

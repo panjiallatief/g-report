@@ -23,3 +23,6 @@ Setelah login, Anda akan diarahkan ke **Dashboard**. Di sini Anda dapat melihat:
 
 ## Mencari Bantuan (Big Book)
 Anda dapat mencari panduan solusi mandiri di kolom pencarian "Cari solusi...". Artikel yang relevan akan muncul untuk membantu Anda menyelesaikan masalah ringan tanpa perlu menunggu teknisi.
+
+![Big Book](screenshots/staff_ticket_list_1765152279197.png)
+

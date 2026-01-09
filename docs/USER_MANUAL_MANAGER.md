@@ -15,10 +15,22 @@ Dashboard Manager menyajikan data analitik real-time:
 ### Grafik & Laporan
 Anda dapat memantau tren kinerja melalui grafik batang dan diagram lingkaran untuk melihat distribusi masalah berdasarkan kategori atau waktu.
 
-![Manager Analytics](screenshots/manager_dashboard_charts_1765152455792.png)
+![Manager Analytics](screenshots/manager_staffperformance.png)
 
 ## Manajemen Rutinitas
 Manager dapat membuat dan mengedit **Template Rutinitas** (Checklist Maintenance).
 -   Atur jadwal (Cron Schedule).
 -   Tentukan item checklist yang harus diperiksa Staff.
 -   Monitor kepatuhan checklist harian.
+
+![Manager Routine](screenshots/manager_routines.png)
+
+## Manajemen Shift
+Manager dapat mengatur jadwal shift untuk Staff. Juga bisa import jadwal shift dari file csv.
+
+![Manager Shift](screenshots/manager_shift.png)
+
+## Manajemen Tiket Histori
+Manager dapat melihat daftar tiket yang pernah dibuat oleh user dan dikerjakan oleh Staff.
+
+![Manager Ticket History](screenshots/manager_ticket_history.png)
