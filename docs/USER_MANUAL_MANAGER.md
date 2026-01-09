@@ -28,9 +28,9 @@ Manager dapat membuat dan mengedit **Template Rutinitas** (Checklist Maintenance
 ## Manajemen Shift
 Manager dapat mengatur jadwal shift untuk Staff. Juga bisa import jadwal shift dari file csv.
 
-![Manager Shift](screenshots/manager_shift.png)
+![Manager Shift](screenshots/manager_shiftmanagement.png)
 
 ## Manajemen Tiket Histori
 Manager dapat melihat daftar tiket yang pernah dibuat oleh user dan dikerjakan oleh Staff.
 
-![Manager Ticket History](screenshots/manager_ticket_history.png)
+![Manager Ticket History](screenshots/manager_tikethistory.png)

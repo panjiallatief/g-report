@@ -28,7 +28,6 @@ Klik pada judul tiket untuk melihat detailnya. Di halaman ini Anda dapat:
 ## Big Book (Knowledge Base)
 Big Book adalah kumpulan artikel solusi. Staff dapat:
 -   Membuat artikel baru berdasar pengalaman perbaikan.
--   Mengubah status tiket menjadi artikel ("Convert to Article").
 -   Mencari panduan teknis yang sudah ada.
 
 ![Big Book](screenshots/staff_ticket_list_1765152279197.png)
